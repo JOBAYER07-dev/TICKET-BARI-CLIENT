@@ -1,6 +1,7 @@
 import './globals.css';
 import Navbar from '@/components/Navbar';
-import { Providers } from './providers'; // প্রোভাইডার ফাইলটি ইম্পোর্ট করলাম
+import { Providers } from './providers';
+import Footer from '@/components/Footer';
 
 export const metadata = {
   title: 'TicketBari - Online Ticket Booking Platform',
@@ -14,7 +15,7 @@ export default function RootLayout({ children }) {
         <Providers>
           <Navbar />
           {children}
-          {/* এখানে ফুটার আসবে */}
+          <Footer/>
         </Providers>
       </body>
     </html>
