@@ -4,28 +4,45 @@ import { useState } from 'react';
 import { Button } from '@heroui/react';
 import { User, Mail, Lock, UserCheck, Bus } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { apiRequest } from '@/utils/api';
 
 export default function RegisterPage() {
+  const router = useRouter();
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
-    role: 'user', // ডিফল্ট রোল 'user' (user | vendor | admin)
+    role: 'user',
   });
 
-  const handleSubmit = e => {
+  const handleSubmit = async e => {
     e.preventDefault();
-    console.log('Registering user with data:', formData);
-    alert(
-      `Account creating request submitted as a ${formData.role.toUpperCase()}!`,
-    );
-    // পরবর্তীতে BetterAuth এবং MongoDB ব্যাকএন্ডের সাথে যুক্ত হবে
+    setError('');
+    setLoading(true);
+
+    try {
+      const data = await apiRequest('/register', {
+        method: 'POST',
+        body: JSON.stringify(formData),
+      });
+
+      if (data.success) {
+        alert('Registration successful! Please login.');
+        router.push('/login');
+      }
+    } catch (err) {
+      setError(err.message || 'Registration failed. Try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="min-h-screen bg-[#121212] text-white flex items-center justify-center px-6 py-12">
       <div className="w-full max-w-md bg-[#1e1e1e]/90 p-8 rounded-2xl border border-neutral-800 shadow-2xl backdrop-blur-md">
-        {/* ব্র্যান্ড লোগো ও হেডিং */}
         <div className="flex flex-col items-center text-center mb-8">
           <div className="flex items-center gap-2 font-bold text-2xl text-emerald-500 mb-2">
             <Bus className="w-7 h-7" />
@@ -39,9 +56,13 @@ export default function RegisterPage() {
           </p>
         </div>
 
-        {/* রেজিস্ট্রেশন ফর্ম */}
+        {error && (
+          <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs font-medium text-center">
+            {error}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* নাম ইনপুট */}
           <div>
             <label className="text-xs font-semibold text-neutral-400 uppercase tracking-wider block mb-1.5">
               Full Name
@@ -61,7 +82,6 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          {/* ইমেইল ইনপুট */}
           <div>
             <label className="text-xs font-semibold text-neutral-400 uppercase tracking-wider block mb-1.5">
               Email Address
@@ -81,7 +101,6 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          {/* পাসওয়ার্ড ইনপুট */}
           <div>
             <label className="text-xs font-semibold text-neutral-400 uppercase tracking-wider block mb-1.5">
               Password
@@ -101,7 +120,6 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          {/* 🎯 আপনার আইডিয়া অনুযায়ী কাস্টম রোল সিলেক্ট অপশন */}
           <div>
             <label className="text-xs font-semibold text-neutral-400 uppercase tracking-wider block mb-1.5">
               Register As (Role)
@@ -123,16 +141,15 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          {/* সাবমিট বাটন */}
           <Button
             type="submit"
+            isLoading={loading}
             className="w-full h-11 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-sm tracking-wide mt-2 shadow-lg shadow-emerald-900/20"
           >
             Sign Up
           </Button>
         </form>
 
-        {/* লগইন লিংক */}
         <p className="text-center text-xs text-neutral-500 mt-6">
           Already have an account?{' '}
           <Link

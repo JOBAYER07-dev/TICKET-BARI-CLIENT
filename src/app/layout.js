@@ -1,22 +1,14 @@
-import './globals.css';
 import Navbar from '@/components/Navbar';
-import { Providers } from './providers';
+import './globals.css';
 import Footer from '@/components/Footer';
-
-export const metadata = {
-  title: 'TicketBari - Online Ticket Booking Platform',
-  description: 'Book bus, train, launch & flight tickets easily.',
-};
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body>
-        <Providers>
-          <Navbar />
-          {children}
-          <Footer/>
-        </Providers>
+    <html lang="en">
+      <body className="bg-[#121212] min-h-screen text-white">
+        <Navbar />
+        <main className="pt-16">{children}</main>
+        <Footer/>
       </body>
     </html>
   );

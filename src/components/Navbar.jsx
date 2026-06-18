@@ -1,175 +1,133 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import {
-  Button,
-  Dropdown,
-  DropdownTrigger,
-  DropdownMenu,
-  DropdownItem,
-  Avatar,
-} from '@heroui/react';
-import { Bus, Moon, Sun, Menu, X } from 'lucide-react';
-import { useTheme } from 'next-themes';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { Button } from '@heroui/react';
+import { Bus, Sun, Moon, User, LogOut, LayoutDashboard } from 'lucide-react';
 
 export default function Navbar() {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
-  const { theme, setTheme } = useTheme();
   const pathname = usePathname();
-
+  const router = useRouter();
+  const [isDarkMode, setIsDarkMode] = useState(true);
   const [user, setUser] = useState(null);
 
+  // Sync user state from localStorage when component mounts or path changes
   useEffect(() => {
-    setMounted(true);
-  }, []);
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    } else {
+      setUser(null);
+    }
+  }, [pathname]); // Pathname target ensures it syncs on redirect/navigation
 
-  const menuItems = [
-    { name: 'Home', path: '/' },
-    { name: 'All Tickets', path: '/tickets' },
-    { name: 'Dashboard', path: '/dashboard' },
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setUser(null);
+    alert('Logged out successfully!');
+    router.push('/login');
+  };
+
+  const navLinks = [
+    { name: 'Home', href: '/' },
+    { name: 'All Tickets', href: '/tickets' },
+    ...(user ? [{ name: 'Dashboard', href: '/dashboard' }] : []),
   ];
 
   return (
-    <nav className="bg-[#121212]/90 border-b border-neutral-800 text-white backdrop-blur-md sticky top-0 z-50 w-full">
-      <div className="max-w-[1280px] mx-auto px-6 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <button
-            type="button"
-            className="sm:hidden text-white focus:outline-none"
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-          >
-            {isMenuOpen ? (
-              <X className="w-6 h-6" />
-            ) : (
-              <Menu className="w-6 h-6" />
-            )}
-          </button>
+    <nav className="w-full h-16 bg-[#1a1a1a]/90 backdrop-blur-md border-b border-neutral-800 fixed top-0 left-0 z-50 px-6 flex items-center justify-between text-white">
+      {/* Brand Logo */}
+      <Link
+        href="/"
+        className="flex items-center gap-2 font-bold text-xl text-emerald-500 hover:opacity-90 transition-opacity"
+      >
+        <Bus className="w-6 h-6" />
+        <span className="tracking-wide text-white">TicketBari</span>
+      </Link>
 
-          <Link
-            href="/"
-            className="flex items-center gap-2 font-bold text-xl text-emerald-500"
-          >
-            <Bus className="w-6 h-6" />
-            <span className="tracking-wide">TicketBari</span>
-          </Link>
-        </div>
-
-        <div className="hidden sm:flex items-center gap-8">
-          {menuItems.map(item => {
-            const isActive = pathname === item.path;
-            return (
-              <Link
-                key={item.name}
-                href={item.path}
-                className={`font-medium transition-colors text-[15px] ${
-                  isActive
-                    ? 'text-emerald-500 font-semibold'
-                    : 'text-neutral-400 hover:text-white'
-                }`}
-              >
-                {item.name}
-              </Link>
-            );
-          })}
-        </div>
-
-        <div className="flex items-center gap-4">
-          <Button
-            isIconOnly
-            variant="light"
-            className="text-neutral-400 hover:text-white min-w-9 w-9 h-9"
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-          >
-            {mounted && theme === 'dark' ? (
-              <Sun className="w-5 h-5" />
-            ) : (
-              <Moon className="w-5 h-5" />
-            )}
-          </Button>
-
-          {user ? (
-            <Dropdown
-              placement="bottom-end"
-              className="bg-[#1e1e1e] border border-neutral-800 text-white"
+      {/* Nav Items */}
+      <div className="flex items-center gap-6 text-sm font-medium">
+        {navLinks.map(link => {
+          const isActive = pathname === link.href;
+          return (
+            <Link
+              key={link.href}
+              href={link.href}
+              className={`transition-colors relative py-1 ${
+                isActive
+                  ? 'text-emerald-500 font-semibold'
+                  : 'text-neutral-400 hover:text-white'
+              }`}
             >
-              <DropdownTrigger>
-                <div className="flex items-center gap-2 cursor-pointer select-none">
-                  <Avatar
-                    className="transition-transform w-8 h-8 text-sm font-semibold bg-emerald-100 text-emerald-800"
-                    name={user.name.split(' ')[0]}
-                    size="sm"
-                  />
-                  <span className="text-sm font-medium hidden md:inline text-neutral-200 hover:text-white">
-                    {user.name}
-                  </span>
-                </div>
-              </DropdownTrigger>
-              <DropdownMenu aria-label="Profile Actions" variant="flat">
-                <DropdownItem
-                  key="profile"
-                  className="h-14 gap-2 text-neutral-300"
-                >
-                  <p className="font-semibold">Signed in as</p>
-                  <p className="font-semibold text-emerald-400">{user.email}</p>
-                </DropdownItem>
-                <DropdownItem
-                  key="my-profile"
-                  as={Link}
-                  href="/dashboard"
-                  className="text-neutral-300 hover:text-white"
-                >
-                  My Profile
-                </DropdownItem>
-                <DropdownItem
-                  key="logout"
-                  color="danger"
-                  onClick={() => setUser(null)}
-                  className="text-danger"
-                >
-                  Logout
-                </DropdownItem>
-              </DropdownMenu>
-            </Dropdown>
-          ) : (
-            <div className="flex items-center gap-2">
-              <Link
-                href="/login"
-                className="border border-neutral-700 text-neutral-200 hover:text-white hover:bg-neutral-800 text-sm font-medium rounded-lg px-4 h-9 flex items-center justify-center transition-colors"
-              >
-                Login
-              </Link>
-              <Link
-                href="/register"
-                className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg px-4 h-9 flex items-center justify-center transition-colors"
-              >
-                Register
-              </Link>
-            </div>
-          )}
-        </div>
+              {link.name}
+              {isActive && (
+                <span className="absolute bottom-0 left-0 w-full h-0.5 bg-emerald-500 rounded-full" />
+              )}
+            </Link>
+          );
+        })}
       </div>
 
-      {isMenuOpen && (
-        <div className="sm:hidden bg-[#121212]/95 border-t border-neutral-900 px-6 py-4 flex flex-col gap-4 absolute w-full left-0 top-16 z-40 backdrop-blur-lg">
-          {menuItems.map(item => (
-            <Link
-              key={item.name}
-              className={`w-full text-lg block py-2 ${
-                pathname === item.path
-                  ? 'text-emerald-500 font-semibold'
-                  : 'text-neutral-400'
-              }`}
-              href={item.path}
-              onClick={() => setIsMenuOpen(false)}
+      {/* Action Buttons / User Profile */}
+      <div className="flex items-center gap-4">
+        <button
+          onClick={() => setIsDarkMode(!isDarkMode)}
+          className="p-2 hover:bg-neutral-800 rounded-full text-neutral-400 hover:text-white transition-colors"
+        >
+          {isDarkMode ? (
+            <Sun className="w-4 h-4" />
+          ) : (
+            <Moon className="w-4 h-4" />
+          )}
+        </button>
+
+        {user ? (
+          /* Dynamic UI when User is Logged In */
+          <div className="flex items-center gap-3 bg-neutral-900 border border-neutral-800 px-3 py-1.5 rounded-xl">
+            <div className="w-7 h-7 bg-emerald-500/10 text-emerald-500 rounded-lg flex items-center justify-center border border-emerald-500/20">
+              <User className="w-4 h-4" />
+            </div>
+            <div className="flex flex-col text-left">
+              <span className="text-xs font-bold leading-tight text-neutral-200">
+                {user.name}
+              </span>
+              <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-500">
+                {user.role}
+              </span>
+            </div>
+            <button
+              onClick={handleLogout}
+              title="Logout Account"
+              className="ml-2 p-1.5 text-neutral-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
             >
-              {item.name}
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
+        ) : (
+          /* Default Authentication Links */
+          <>
+            <Link href="/login">
+              <Button
+                size="sm"
+                variant="light"
+                className="text-neutral-300 hover:text-white text-xs font-semibold px-4 h-9"
+              >
+                Login
+              </Button>
             </Link>
-          ))}
-        </div>
-      )}
+            <Link href="/register">
+              <Button
+                size="sm"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl px-4 h-9 shadow-lg shadow-emerald-900/20"
+              >
+                Register
+              </Button>
+            </Link>
+          </>
+        )}
+      </div>
     </nav>
   );
 }
