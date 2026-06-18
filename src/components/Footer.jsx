@@ -9,7 +9,6 @@ export default function Footer() {
   return (
     <footer className="bg-[#121212] border-t border-neutral-800 text-neutral-400 pt-12 pb-6 w-full">
       <div className="max-w-[1280px] mx-auto px-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-        {/* কলাম ১: লোগো এবং ডেসক্রিপশন */}
         <div className="flex flex-col gap-3">
           <Link
             href="/"
@@ -23,7 +22,6 @@ export default function Footer() {
           </p>
         </div>
 
-        {/* কলাম ২: কুইক লিংকস */}
         <div>
           <h4 className="text-white font-semibold text-[15px] mb-4 tracking-wide">
             Quick Links
@@ -61,7 +59,6 @@ export default function Footer() {
           </ul>
         </div>
 
-        {/* কলাম ৩: কন্টাক্ট ইনফো ও মডার্ন X লোগো */}
         <div>
           <h4 className="text-white font-semibold text-[15px] mb-4 tracking-wide">
             Contact
@@ -86,7 +83,6 @@ export default function Footer() {
               </a>
             </li>
 
-            {/* 🎯 রিকোয়ারমেন্ট রুল ৯ মেনে নিখুঁত কাস্টম X (Twitter) SVG লোগো */}
             <li className="flex items-center gap-2 mt-1">
               <svg
                 viewBox="0 0 24 24"
@@ -107,7 +103,6 @@ export default function Footer() {
           </ul>
         </div>
 
-        {/* কলাম ৪: পেমেন্ট মেথড (Stripe পার্টনার) */}
         <div>
           <h4 className="text-white font-semibold text-[15px] mb-4 tracking-wide">
             Payment
@@ -121,7 +116,6 @@ export default function Footer() {
         </div>
       </div>
 
-      {/* কপিরাইট সেকশন */}
       <div className="max-w-[1280px] mx-auto px-6 mt-12 pt-6 border-t border-neutral-950 text-center text-xs tracking-wide">
         <p>© {currentYear} TicketBari. All rights reserved.</p>
       </div>

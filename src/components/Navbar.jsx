@@ -20,18 +20,7 @@ export default function Navbar() {
   const { theme, setTheme } = useTheme();
   const pathname = usePathname();
 
-  // 🎯 এখানে ডিফল্টভাবে null করে দেওয়া হলো, যাতে প্রথমে Login/Register দেখায়।
-  // টেস্ট করার জন্য null কেটে দিয়ে নিচের কমেন্ট করা অবজেক্টটি বসিয়ে চেক করতে পারেন।
   const [user, setUser] = useState(null);
-
-  /* // কোড টেস্টিং এর জন্য ইউজার অবজেক্টের নমুনা:
-  const [user, setUser] = useState({
-    name: 'John D.',
-    email: 'john@example.com',
-    avatar: '',
-    role: 'user', 
-  });
-  */
 
   useEffect(() => {
     setMounted(true);
@@ -46,7 +35,6 @@ export default function Navbar() {
   return (
     <nav className="bg-[#121212]/90 border-b border-neutral-800 text-white backdrop-blur-md sticky top-0 z-50 w-full">
       <div className="max-w-[1280px] mx-auto px-6 h-16 flex items-center justify-between">
-        {/* মোবাইল মেনু বাটন ও ব্র্যান্ড লোগো */}
         <div className="flex items-center gap-4">
           <button
             type="button"
@@ -69,7 +57,6 @@ export default function Navbar() {
           </Link>
         </div>
 
-        {/* ডেস্কটপ নেভিগেশন লিংকস */}
         <div className="hidden sm:flex items-center gap-8">
           {menuItems.map(item => {
             const isActive = pathname === item.path;
@@ -89,7 +76,6 @@ export default function Navbar() {
           })}
         </div>
 
-        {/* রাইট সাইড কন্ট্রোল */}
         <div className="flex items-center gap-4">
           <Button
             isIconOnly
@@ -105,7 +91,6 @@ export default function Navbar() {
           </Button>
 
           {user ? (
-            /* ইউজার লগইন থাকলে এই প্রোফাইল ড্রপডাউনটি শো করবে */
             <Dropdown
               placement="bottom-end"
               className="bg-[#1e1e1e] border border-neutral-800 text-white"
@@ -149,7 +134,6 @@ export default function Navbar() {
               </DropdownMenu>
             </Dropdown>
           ) : (
-            /* ইউজার লগআউট বা ডিফল্ট অবস্থায় এই বাটন দুটি শো করবে */
             <div className="flex items-center gap-2">
               <Link
                 href="/login"
@@ -168,7 +152,6 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* mobile menu layout */}
       {isMenuOpen && (
         <div className="sm:hidden bg-[#121212]/95 border-t border-neutral-900 px-6 py-4 flex flex-col gap-4 absolute w-full left-0 top-16 z-40 backdrop-blur-lg">
           {menuItems.map(item => (

@@ -6,7 +6,6 @@
   --color-foreground: #ffffff;
 }
 
-/* গলোবাল বেস স্টাইল */
 @layer base {
   html {
     scroll-behavior: smooth;
@@ -23,7 +22,7 @@
   }
 }
 
-/* প্রিমিয়াম স্ক্রোলবার */
+
 ::-webkit-scrollbar {
   width: 8px;
 }
