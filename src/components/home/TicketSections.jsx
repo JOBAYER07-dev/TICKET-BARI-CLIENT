@@ -4,6 +4,7 @@ import { Button } from '@heroui/react';
 import { Calendar, User, Bus, Train, Plane, Ship } from 'lucide-react';
 import Link from 'next/link';
 
+// 🎯 স্প্রেড অপারেটরের অসম্পূর্ণ ডটগুলো ফেলে এখানে ইউনিভার্সাল অবজেক্ট দিয়ে ডাটা ম্যাপ কমপ্লিট করা হলো
 const adminHandpicked = [
   {
     id: 1,
@@ -130,14 +131,17 @@ function TicketGrid({ title, subtitle, data }) {
                   </div>
                 </div>
 
-                <Button
-                  as={Link}
+                <Link
                   href={`/tickets/${ticket.id}`}
-                  variant="bordered"
-                  className="w-full mt-4 border-neutral-800 text-neutral-300 hover:text-white hover:bg-neutral-800 font-medium rounded-xl text-sm"
+                  className="w-full mt-4 block"
                 >
-                  See Details
-                </Button>
+                  <Button
+                    variant="bordered"
+                    className="w-full border-neutral-800 text-neutral-300 hover:text-white hover:bg-neutral-800 font-medium rounded-xl text-sm"
+                  >
+                    See Details
+                  </Button>
+                </Link>
               </div>
             </div>
           );

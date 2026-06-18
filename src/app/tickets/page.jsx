@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@heroui/react';
-import { Bus, Train, Plane, Ship, Calendar, User, Search } from 'lucide-react';
+import { Bus, Train, Plane, Ship, Calendar, User } from 'lucide-react';
 import Link from 'next/link';
 
 // 🎯 ডামি টিকিট ডেটা (সার্ভার সাইড তৈরি করার আগ পর্যন্ত ফ্রন্টএন্ড নিখুঁতভাবে টেস্ট করার জন্য)
@@ -218,7 +218,7 @@ export default function TicketsPage() {
           </div>
         </form>
 
-        {/* 🎟️ টিকিট কার্ড গ্রিড (সমান হাইট ও উইডথ রুলস) */}
+        {/* 🎟️ টিকিট কাস্টম কার্ড গ্রিড */}
         {currentDisplayedTickets.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
             {currentDisplayedTickets.map(ticket => {
@@ -264,14 +264,17 @@ export default function TicketsPage() {
                       </div>
                     </div>
 
-                    <Button
-                      as={Link}
+                    <Link
                       href={`/tickets/${ticket.id}`}
-                      variant="bordered"
-                      className="w-full mt-4 border-neutral-800 text-neutral-300 hover:text-white hover:bg-neutral-800 font-medium rounded-xl text-sm"
+                      className="w-full mt-4 block"
                     >
-                      See Details
-                    </Button>
+                      <Button
+                        variant="bordered"
+                        className="w-full border-neutral-800 text-neutral-300 hover:text-white hover:bg-neutral-800 font-medium rounded-xl text-sm"
+                      >
+                        See Details
+                      </Button>
+                    </Link>
                   </div>
                 </div>
               );
@@ -283,10 +286,11 @@ export default function TicketsPage() {
           </div>
         )}
 
-        {/* 🔢 পেজিনেশন বার লেআউট (স্ক্রিনশট ম্যাচিং) */}
+        {/* 🔢 পেজিনেশন বার লেআউট */}
         {totalPages > 1 && (
           <div className="flex items-center justify-center gap-2 mt-8">
             <button
+              type="button"
               onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
               disabled={currentPage === 1}
               className="px-4 h-9 border border-neutral-800 rounded-lg text-sm font-medium hover:bg-neutral-800 disabled:opacity-40 disabled:hover:bg-transparent text-neutral-300 transition-colors"
@@ -297,6 +301,7 @@ export default function TicketsPage() {
             {Array.from({ length: totalPages }, (_, index) => (
               <button
                 key={index + 1}
+                type="button"
                 onClick={() => setCurrentPage(index + 1)}
                 className={`w-9 h-9 border rounded-lg text-sm font-medium transition-colors ${
                   currentPage === index + 1
@@ -309,6 +314,7 @@ export default function TicketsPage() {
             ))}
 
             <button
+              type="button"
               onClick={() =>
                 setCurrentPage(prev => Math.min(prev + 1, totalPages))
               }
