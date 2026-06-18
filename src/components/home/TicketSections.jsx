@@ -4,7 +4,6 @@ import { Button } from '@heroui/react';
 import { Calendar, User, Bus, Train, Plane, Ship } from 'lucide-react';
 import Link from 'next/link';
 
-// ডামি ডেটা যা আপনার স্ক্রিনশটের ডিজাইনের সাথে হুবহু মিলবে
 const adminHandpicked = [
   {
     id: 1,
@@ -87,7 +86,6 @@ function TicketGrid({ title, subtitle, data }) {
         <p className="text-sm text-neutral-500">{subtitle}</p>
       </div>
 
-      {/* ৩টি কলামের সমান হাইট-উইডথ গ্রিড (রিকোয়ারমেন্ট রুলস) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {data.map(ticket => {
           const IconComponent = ticket.icon;
@@ -96,7 +94,6 @@ function TicketGrid({ title, subtitle, data }) {
               key={ticket.id}
               className="bg-[#1e1e1e] border border-neutral-800 rounded-2xl overflow-hidden flex flex-col justify-between h-[360px] hover:border-neutral-700 transition-all group shadow-lg"
             >
-              {/* ক্যাটাগরি ভিত্তিক গ্লসি আইকন পার্ট */}
               <div
                 className={`h-36 flex items-center justify-center border-b border-neutral-800/60 relative overflow-hidden ${ticket.color.split(' ')[0]}`}
               >
@@ -104,7 +101,6 @@ function TicketGrid({ title, subtitle, data }) {
                 <div className="absolute inset-0 bg-gradient-to-t from-[#1e1e1e] to-transparent z-0"></div>
               </div>
 
-              {/* টিকিট বডি ডেটা */}
               <div className="p-5 flex-1 flex flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between mb-2">
@@ -134,7 +130,6 @@ function TicketGrid({ title, subtitle, data }) {
                   </div>
                 </div>
 
-                {/* ফুল উইডথ সি ডিটেইলস বাটন */}
                 <Button
                   as={Link}
                   href={`/tickets/${ticket.id}`}
