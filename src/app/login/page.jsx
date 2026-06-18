@@ -38,21 +38,20 @@ export default function LoginPage() {
     }
   };
 
-  // Requirement 2: Official Live BetterAuth Style Google Sign-In Channel Connection
+  // Requirement 2: Real Google OAuth 2.0 Identity Token Verification Pipeline
   const handleGoogleLogin = async () => {
     setError('');
     setGoogleLoading(true);
     try {
-      // 1. Pull the official Google Client ID from environment configurations
       const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 
       if (!GOOGLE_CLIENT_ID) {
         throw new Error(
-          "OAuth configuration metric 'NEXT_PUBLIC_GOOGLE_CLIENT_ID' is missing.",
+          'OAuth Client ID key is missing in your environment configuration.',
         );
       }
 
-      // 2. Generate Google OAuth Endpoint matching your updated Redirect URI dashboard paths
+      // 🎯 STRICT TARGET: Explicitly specifying dashboard redirect mapping to capture response tokens
       const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(window.location.origin + '/dashboard')}&response_type=token&scope=email%20profile`;
 
       const width = 500,
@@ -60,40 +59,68 @@ export default function LoginPage() {
       const left = window.screen.width / 2 - width / 2;
       const top = window.screen.height / 2 - height / 2;
 
-      // 3. Open the safe Google Authentication interface container window
       const popup = window.open(
         googleAuthUrl,
         'Google SignIn',
         `width=${width},height=${height},top=${top},left=${left},scrollbars=yes,resizable=yes`,
       );
 
-      // 4. Trace closing trigger and perform MongoDB synchronization pipeline
+      // Listen for the hash token parameter explicitly forwarded on successful consent
       const timer = setInterval(async () => {
-        if (!popup || popup.closed) {
-          clearInterval(timer);
-
-          const mockSocialPayload = {
-            name: 'Google User Verified',
-            email: 'auth.tester2026@gmail.com',
-            photoURL: '',
-          };
-
-          const data = await apiRequest('/auth/social-sync', {
-            method: 'POST',
-            body: JSON.stringify(mockSocialPayload),
-          });
-
-          if (data.success && data.token) {
-            localStorage.setItem('token', data.token);
-            localStorage.setItem('user', JSON.stringify(data.user));
-            alert(
-              'Google Account Confirmed successfully via BetterAuth pipeline!',
-            );
-            router.push('/dashboard');
+        try {
+          if (!popup || popup.closed) {
+            clearInterval(timer);
+            setGoogleLoading(false);
+            return;
           }
-          setGoogleLoading(false);
+
+          // Inspect popup location to safely extract the authorized access_token
+          const currentUrl = popup.location.href;
+          if (currentUrl.includes('access_token=')) {
+            clearInterval(timer);
+
+            const params = new URLSearchParams(
+              popup.location.hash.replace('#', '?'),
+            );
+            const accessToken = params.get('access_token');
+            popup.close();
+
+            // Fetch live, real-time authenticated profile directly from Google Resource Servers
+            const googleProfileResponse = await fetch(
+              `https://www.googleapis.com/oauth2/v3/userinfo?access_token=${accessToken}`,
+            );
+            const googleUser = await googleProfileResponse.json();
+
+            if (!googleUser.email) {
+              throw new Error(
+                'Failed to retrieve profile credentials from Google.',
+              );
+            }
+
+            // Synchronize the genuine user data directly with your MongoDB database layer
+            const data = await apiRequest('/auth/social-sync', {
+              method: 'POST',
+              body: JSON.stringify({
+                name: googleUser.name || 'Google Passenger',
+                email: googleUser.email,
+                photoURL: googleUser.picture || '',
+              }),
+            });
+
+            if (data.success && data.token) {
+              localStorage.setItem('token', data.token);
+              localStorage.setItem('user', JSON.stringify(data.user));
+              alert(
+                `Welcome, ${data.user.name}! Authenticated successfully via Google OAuth.`,
+              );
+              router.push('/dashboard');
+            }
+            setGoogleLoading(false);
+          }
+        } catch (originError) {
+          // Cross-origin boundaries are expected until the popup redirects back to your dashboard origin
         }
-      }, 1500);
+      }, 500);
     } catch (err) {
       setError(
         err.message || 'Social identity synchronization pipeline failed.',
@@ -170,6 +197,7 @@ export default function LoginPage() {
           </Button>
         </form>
 
+        {/* Requirement 2: Social Login Section */}
         <div className="relative flex items-center justify-center my-6">
           <div className="absolute w-full border-t border-neutral-800"></div>
           <span className="relative bg-[#1e1e1e] px-3 text-xs text-neutral-500 uppercase font-medium">
@@ -183,6 +211,7 @@ export default function LoginPage() {
           variant="bordered"
           className="w-full h-11 border-neutral-800 hover:bg-neutral-800 text-neutral-200 font-semibold rounded-xl text-sm flex items-center justify-center gap-2"
         >
+          {/* Custom SVG Google Icon Vector */}
           <svg className="w-4 h-4" viewBox="0 0 24 24">
             <path
               fill="#EA4335"
