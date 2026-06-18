@@ -1,330 +1,187 @@
 'use client';
 
-import { useState } from 'react';
-import { Button } from '@heroui/react';
-import { Bus, Train, Plane, Ship, Calendar, User } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Button, Card, Input } from '@heroui/react';
+import { Search, Bus, Train, Plane, MapPin } from 'lucide-react';
 import Link from 'next/link';
+import { apiRequest } from '@/utils/api';
 
-// 🎯 ডামি টিকিট ডেটা (সার্ভার সাইড তৈরি করার আগ পর্যন্ত ফ্রন্টএন্ড নিখুঁতভাবে টেস্ট করার জন্য)
-const allApprovedTickets = [
-  {
-    id: 1,
-    type: 'Bus',
-    icon: Bus,
-    color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-    price: 550,
-    from: 'Dhaka',
-    to: 'Chittagong',
-    date: 'June 25, 8:00 AM',
-    seats: 30,
-  },
-  {
-    id: 2,
-    type: 'Train',
-    icon: Train,
-    color: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-    price: 320,
-    from: 'Dhaka',
-    to: 'Sylhet',
-    date: 'June 26, 6:30 AM',
-    seats: 50,
-  },
-  {
-    id: 3,
-    type: 'Plane',
-    icon: Plane,
-    color: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
-    price: 4200,
-    from: 'Dhaka',
-    to: "Cox's Bazar",
-    date: 'June 27, 10:00 AM',
-    seats: 12,
-  },
-  {
-    id: 4,
-    type: 'Launch',
-    icon: Ship,
-    color: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-    price: 280,
-    from: 'Dhaka',
-    to: 'Barisal',
-    date: 'June 28, 9:00 PM',
-    seats: 80,
-  },
-  {
-    id: 5,
-    type: 'Bus',
-    icon: Bus,
-    color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-    price: 420,
-    from: 'Dhaka',
-    to: 'Rajshahi',
-    date: 'June 29, 7:00 AM',
-    seats: 45,
-  },
-  {
-    id: 6,
-    type: 'Train',
-    icon: Train,
-    color: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-    price: 480,
-    from: 'Dhaka',
-    to: 'Khulna',
-    date: 'June 30, 5:30 AM',
-    seats: 60,
-  },
-  {
-    id: 7,
-    type: 'Bus',
-    icon: Bus,
-    color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-    price: 600,
-    from: 'Dhaka',
-    to: 'Sylhet',
-    date: 'July 01, 11:00 PM',
-    seats: 20,
-  },
-  {
-    id: 8,
-    type: 'Launch',
-    icon: Ship,
-    color: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-    price: 350,
-    from: 'Dhaka',
-    to: 'Chandpur',
-    date: 'July 02, 4:00 PM',
-    seats: 100,
-  },
-];
+export default function AllTicketsPage() {
+  const [tickets, setTickets] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-export default function TicketsPage() {
-  // সার্চ, ফিল্টার এবং সর্ট স্টেট
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
-  const [transportType, setType] = useState('All Types');
-  const [sortBy, setSortBy] = useState('Default sort');
+  // Search & Filter States
+  const [searchFrom, setSearchFrom] = useState('');
+  const [searchTo, setSearchTo] = useState('');
+  const [selectedType, setSelectedType] = useState('All Types');
+  const [sortBy, setSortBy] = useState('Default');
 
-  // ফিল্টারড ও ফাইনাল ডিসপ্লে ডেটা স্টেট
-  const [filteredTickets, setFilteredTickets] = useState(allApprovedTickets);
+  // Fetch data from backend API
+  const fetchTickets = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const queryParams = new URLSearchParams();
+      if (searchFrom) queryParams.append('from', searchFrom);
+      if (searchTo) queryParams.append('to', searchTo);
+      if (selectedType && selectedType !== 'All Types')
+        queryParams.append('type', selectedType);
+      if (sortBy && sortBy !== 'Default') queryParams.append('sortBy', sortBy);
 
-  // পেজিনেশন স্টেট (চ্যালেঞ্জ রিকোয়ারমেন্ট ৪: প্রতি পেজে ৬টি করে টিকিট দেখাবে)
-  const [currentPage, setCurrentPage] = useState(1);
-  const ticketsPerPage = 6;
-
-  // 🔍 ফিল্টারিং এবং সর্টিং হ্যান্ডলার লজিক (চ্যালেঞ্জ রিকোয়ারমেন্ট ১ ও ২)
-  const applyFilters = e => {
-    if (e) e.preventDefault();
-
-    let tempTickets = [...allApprovedTickets];
-
-    // From Location ফিল্টার
-    if (from.trim() !== '') {
-      tempTickets = tempTickets.filter(t =>
-        t.from.toLowerCase().includes(from.toLowerCase()),
-      );
+      const data = await apiRequest(`/tickets?${queryParams.toString()}`);
+      setTickets(data);
+    } catch (err) {
+      setError(err.message || 'Failed to load tickets.');
+    } finally {
+      setLoading(false);
     }
-
-    // To Location ফিল্টার
-    if (to.trim() !== '') {
-      tempTickets = tempTickets.filter(t =>
-        t.to.toLowerCase().includes(to.toLowerCase()),
-      );
-    }
-
-    // Transport Type ফিল্টার
-    if (transportType !== 'All Types') {
-      tempTickets = tempTickets.filter(t => t.type === transportType);
-    }
-
-    // Price সর্টিং (Low to High / High to Low)
-    if (sortBy === 'Price: Low to High') {
-      tempTickets.sort((a, b) => a.price - b.price);
-    } else if (sortBy === 'Price: High to Low') {
-      tempTickets.sort((a, b) => b.price - a.price);
-    }
-
-    setFilteredTickets(tempTickets);
-    setCurrentPage(1); // সার্চ বা ফিল্টার করলে পেজিনেশন ১ নম্বর পেজে ব্যাক করবে
   };
 
-  // পেজিনেশন ক্যালকুলেশন লজিক
-  const indexOfLastTicket = currentPage * ticketsPerPage;
-  const indexOfFirstTicket = indexOfLastTicket - ticketsPerPage;
-  const currentDisplayedTickets = filteredTickets.slice(
-    indexOfFirstTicket,
-    indexOfLastTicket,
-  );
-  const totalPages = Math.ceil(filteredTickets.length / ticketsPerPage);
+  useEffect(() => {
+    fetchTickets();
+  }, [selectedType, sortBy]);
+
+  const handleSearchSubmit = e => {
+    e.preventDefault();
+    fetchTickets();
+  };
+
+  const transportIcons = {
+    Bus: <Bus className="w-5 h-5" />,
+    Train: <Train className="w-5 h-5" />,
+    Plane: <Plane className="w-5 h-5" />,
+  };
 
   return (
-    <div className="min-h-screen bg-[#121212] text-white py-12 px-6">
-      <div className="max-w-[1280px] mx-auto">
-        <h1 className="text-3xl font-bold tracking-tight mb-8">All Tickets</h1>
-
-        {/* 🛠️ সার্চ, ফিল্টার এবং সর্ট বার লেআউট (স্ক্রিনশট ম্যাচিং) */}
+    <div className="min-h-screen bg-[#121212] text-white px-6 py-8">
+      {/* Search Header Wrapper */}
+      <div className="max-w-6xl mx-auto mb-10 bg-[#1e1e1e] p-6 rounded-2xl border border-neutral-800 shadow-xl">
+        <h2 className="text-xl font-bold mb-4 text-neutral-200">
+          Search Active Routes
+        </h2>
         <form
-          onSubmit={applyFilters}
-          className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 bg-[#1e1e1e] p-4 rounded-xl border border-neutral-800 mb-10 items-end"
+          onSubmit={handleSearchSubmit}
+          className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end"
         >
+          <Input
+            label="From"
+            placeholder="e.g. Dhaka"
+            value={searchFrom}
+            onChange={e => setSearchFrom(e.target.value)}
+            className="dark"
+          />
+          <Input
+            label="To"
+            placeholder="e.g. Chittagong"
+            value={searchTo}
+            onChange={e => setSearchTo(e.target.value)}
+            className="dark"
+          />
+          <Button
+            type="submit"
+            className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold h-12 rounded-xl flex items-center gap-2"
+          >
+            <Search className="w-4 h-4" /> Search Fleet
+          </Button>
+        </form>
+      </div>
+
+      {/* Main Grid View */}
+      <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-4 gap-8">
+        {/* Left Filters Panel */}
+        <div className="space-y-6 bg-[#1e1e1e] p-5 rounded-2xl border border-neutral-800 h-fit">
           <div>
-            <input
-              type="text"
-              placeholder="From"
-              value={from}
-              onChange={e => setFrom(e.target.value)}
-              className="w-full h-10 bg-neutral-900 border border-neutral-800 rounded-lg px-3 text-sm text-white focus:outline-none focus:border-emerald-500 transition-colors"
-            />
-          </div>
-          <div>
-            <input
-              type="text"
-              placeholder="To"
-              value={to}
-              onChange={e => setTo(e.target.value)}
-              className="w-full h-10 bg-neutral-900 border border-neutral-800 rounded-lg px-3 text-sm text-white focus:outline-none focus:border-emerald-500 transition-colors"
-            />
-          </div>
-          <div>
+            <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider block mb-2">
+              Transport Type
+            </label>
             <select
-              value={transportType}
-              onChange={e => setType(e.target.value)}
-              className="w-full h-10 bg-neutral-900 border border-neutral-800 rounded-lg px-3 text-sm text-white focus:outline-none focus:border-emerald-500 cursor-pointer"
+              value={selectedType}
+              onChange={e => setSelectedType(e.target.value)}
+              className="w-full h-10 bg-neutral-900 border border-neutral-800 rounded-xl px-3 text-sm text-white focus:outline-none focus:border-emerald-500 cursor-pointer"
             >
-              <option value="All Types">All Types</option>
-              <option value="Bus">Bus</option>
-              <option value="Train">Train</option>
-              <option value="Launch">Launch</option>
-              <option value="Plane">Plane</option>
+              <option value="All Types">All Transports</option>
+              <option value="Bus">Bus Fleet</option>
+              <option value="Train">Railway Train</option>
+              <option value="Plane">Air Flight</option>
             </select>
           </div>
+
           <div>
+            <label className="text-xs font-bold text-neutral-500 uppercase tracking-wider block mb-2">
+              Order Price By
+            </label>
             <select
               value={sortBy}
               onChange={e => setSortBy(e.target.value)}
-              className="w-full h-10 bg-neutral-900 border border-neutral-800 rounded-lg px-3 text-sm text-white focus:outline-none focus:border-emerald-500 cursor-pointer"
+              className="w-full h-10 bg-neutral-900 border border-neutral-800 rounded-xl px-3 text-sm text-white focus:outline-none focus:border-emerald-500 cursor-pointer"
             >
-              <option value="Default sort">Default sort</option>
+              <option value="Default">Default View</option>
               <option value="Price: Low to High">Price: Low to High</option>
               <option value="Price: High to Low">Price: High to Low</option>
             </select>
           </div>
-          <div>
-            <Button
-              type="submit"
-              className="w-full bg-neutral-800 hover:bg-neutral-700 text-white font-semibold rounded-lg text-sm h-10 flex items-center justify-center gap-2 border border-neutral-700 transition-colors"
-            >
-              Filter
-            </Button>
-          </div>
-        </form>
+        </div>
 
-        {/* 🎟️ টিকিট কাস্টম কার্ড গ্রিড */}
-        {currentDisplayedTickets.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-            {currentDisplayedTickets.map(ticket => {
-              const IconComponent = ticket.icon;
-              return (
-                <div
-                  key={ticket.id}
-                  className="bg-[#1e1e1e] border border-neutral-800 rounded-2xl overflow-hidden flex flex-col justify-between h-[360px] hover:border-neutral-700 transition-all shadow-lg"
-                >
-                  <div
-                    className={`h-36 flex items-center justify-center relative overflow-hidden ${ticket.color.split(' ')[0]}`}
-                  >
-                    <IconComponent className="w-12 h-12 relative z-10" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#1e1e1e] to-transparent z-0"></div>
-                  </div>
-
-                  <div className="p-5 flex-1 flex flex-col justify-between">
+        {/* Right Active Tickets Listing */}
+        <div className="lg:col-span-3 space-y-4">
+          {loading ? (
+            <p className="text-neutral-500 text-sm text-center py-10">
+              Fetching live schedules from server...
+            </p>
+          ) : error ? (
+            <p className="text-red-400 text-sm text-center py-10">{error}</p>
+          ) : tickets.length === 0 ? (
+            <p className="text-neutral-500 text-sm text-center py-10">
+              No schedules matched your parameters.
+            </p>
+          ) : (
+            tickets.map(ticket => (
+              <Card
+                key={ticket._id || ticket.id}
+                className="bg-[#1e1e1e] border border-neutral-800 rounded-2xl shadow-lg hover:border-neutral-700 transition-all"
+              >
+                {/* Replaced CardBody with a standard responsive padding div */}
+                <div className="p-5 flex flex-col sm:flex-row justify-between sm:items-center gap-6">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-emerald-500/10 text-emerald-500 rounded-xl border border-emerald-500/20">
+                      {transportIcons[ticket.type] || (
+                        <Bus className="w-5 h-5" />
+                      )}
+                    </div>
                     <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span
-                          className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${ticket.color}`}
-                        >
-                          {ticket.type}
-                        </span>
-                        <span className="text-emerald-400 font-bold text-lg">
-                          ৳ {ticket.price}
-                        </span>
-                      </div>
-
-                      <h3 className="text-white font-bold text-lg tracking-tight mb-3">
-                        {ticket.from} ➔ {ticket.to}
+                      <h3 className="font-bold text-lg text-white leading-snug">
+                        {ticket.company}
                       </h3>
-
-                      <div className="flex flex-col gap-1.5 text-xs text-neutral-400">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-3.5 h-3.5 text-neutral-500" />
-                          <span>{ticket.date}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <User className="w-3.5 h-3.5 text-neutral-500" />
-                          <span>{ticket.seats} seats left</span>
-                        </div>
+                      <div className="flex items-center gap-2 text-xs text-neutral-400 mt-1">
+                        <MapPin className="w-3.5 h-3.5 text-neutral-500" />
+                        <span>
+                          {ticket.from} ➔ {ticket.to}
+                        </span>
                       </div>
                     </div>
+                  </div>
 
-                    <Link
-                      href={`/tickets/${ticket.id}`}
-                      className="w-full mt-4 block"
-                    >
-                      <Button
-                        variant="bordered"
-                        className="w-full border-neutral-800 text-neutral-300 hover:text-white hover:bg-neutral-800 font-medium rounded-xl text-sm"
-                      >
+                  <div className="flex items-center justify-between sm:justify-end gap-8 border-t sm:border-t-0 pt-4 sm:pt-0 border-neutral-900">
+                    <div className="text-left sm:text-right">
+                      <div className="text-xs text-neutral-500 uppercase tracking-wider">
+                        Starting Fare
+                      </div>
+                      <div className="text-xl font-black text-emerald-400 mt-0.5">
+                        ৳ {ticket.price}
+                      </div>
+                    </div>
+                    <Link href={`/tickets/${ticket._id || ticket.id}`}>
+                      <Button className="bg-neutral-800 hover:bg-neutral-700 text-white font-semibold rounded-xl text-xs px-5 h-10 border border-neutral-700">
                         See Details
                       </Button>
                     </Link>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="text-center py-20 bg-[#1e1e1e] rounded-2xl border border-neutral-800 text-neutral-500">
-            No tickets found matching your filter criteria.
-          </div>
-        )}
-
-        {/* 🔢 পেজিনেশন বার লেআউট */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-center gap-2 mt-8">
-            <button
-              type="button"
-              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-              disabled={currentPage === 1}
-              className="px-4 h-9 border border-neutral-800 rounded-lg text-sm font-medium hover:bg-neutral-800 disabled:opacity-40 disabled:hover:bg-transparent text-neutral-300 transition-colors"
-            >
-              &lt; Prev
-            </button>
-
-            {Array.from({ length: totalPages }, (_, index) => (
-              <button
-                key={index + 1}
-                type="button"
-                onClick={() => setCurrentPage(index + 1)}
-                className={`w-9 h-9 border rounded-lg text-sm font-medium transition-colors ${
-                  currentPage === index + 1
-                    ? 'bg-emerald-600 border-emerald-600 text-white font-bold'
-                    : 'border-neutral-800 hover:bg-neutral-800 text-neutral-400'
-                }`}
-              >
-                {index + 1}
-              </button>
-            ))}
-
-            <button
-              type="button"
-              onClick={() =>
-                setCurrentPage(prev => Math.min(prev + 1, totalPages))
-              }
-              disabled={currentPage === totalPages}
-              className="px-4 h-9 border border-neutral-800 rounded-lg text-sm font-medium hover:bg-neutral-800 disabled:opacity-40 disabled:hover:bg-transparent text-neutral-300 transition-colors"
-            >
-              Next &gt;
-            </button>
-          </div>
-        )}
+              </Card>
+            ))
+          )}
+        </div>
       </div>
     </div>
   );
