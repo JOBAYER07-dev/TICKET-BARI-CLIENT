@@ -17,7 +17,6 @@ import {
   XCircle,
   ToggleLeft,
   ToggleRight,
-  Star,
 } from 'lucide-react';
 import { apiRequest } from '@/utils/api';
 import { useRouter } from 'next/navigation';
@@ -114,7 +113,6 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Storage Layers
   const [bookings, setBookings] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [vendorTickets, setVendorTickets] = useState([]);
@@ -122,220 +120,21 @@ export default function DashboardPage() {
   const [allUsers, setAllUsers] = useState([]);
   const [allTickets, setAllTickets] = useState([]);
 
-  // Modal payment structures
+  // Stripe Checkout States
   const [payTarget, setPayTarget] = useState(null);
-  const [stripeForm, setStripeForm] = useState({
-    card: '4242 •••• •••• 4242',
-    holder: '',
+  const [cardDetails, setCardDetails] = useState({
+    number: '',
+    expiry: '',
+    cvc: '',
+    name: '',
   });
   const [payLoading, setPayLoading] = useState(false);
 
-  // Form entries
   const [newTicket, setNewTicket] = useState(EMPTY_TICKET);
-  const [imageFile, setImageFile] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [editingId, setEditingId] = useState(null);
 
-  const fetchData = async u => {
-    try {
-      if (u.role === 'admin') {
-        const [users, tickets] = await Promise.all([
-          apiRequest('/users'),
-          apiRequest('/tickets/all'),
-        ]);
-        setAllUsers(users || []);
-        setAllTickets(tickets || []);
-      } else if (u.role === 'vendor') {
-        const [vt, rb] = await Promise.all([
-          apiRequest(`/tickets/vendor?email=${u.email}`),
-          apiRequest('/bookings/vendor'),
-        ]);
-        setVendorTickets(vt || []);
-        setRequestedBookings(rb || []);
-      } else {
-        const [bk, tx] = await Promise.all([
-          apiRequest(`/bookings?email=${u.email}`),
-          apiRequest(`/transactions?email=${u.email}`).catch(() => []),
-        ]);
-        setBookings(bk || []);
-        setTransactions(tx || []);
-      }
-    } catch (e) {
-      setError(e.message || 'Error processing network requests.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    const stored = localStorage.getItem('user');
-    if (!stored) {
-      router.push('/login');
-      return;
-    }
-    const parsed = JSON.parse(stored);
-    setUser(parsed);
-    fetchData(parsed);
-  }, []);
-
-  const handleCreateOrUpdateTicket = async e => {
-    e.preventDefault();
-    setSubmitting(true);
-    try {
-      const payload = {
-        ...newTicket,
-        price: Number(newTicket.price),
-        seats: Number(newTicket.seats),
-        company: newTicket.title,
-        vendorName: user.name,
-        vendorEmail: user.email,
-      };
-
-      if (editingId) {
-        await apiRequest(`/tickets/${editingId}`, {
-          method: 'PATCH',
-          body: JSON.stringify(payload),
-        });
-        toast.success('Ticket layout modified successfully.');
-      } else {
-        await apiRequest('/tickets', {
-          method: 'POST',
-          body: JSON.stringify(payload),
-        });
-        toast.success('Ticket submitted successfully to Admin Panel queue!');
-      }
-
-      setNewTicket(EMPTY_TICKET);
-      setEditingId(null);
-      fetchData(user);
-      setActiveTab('my-tickets');
-    } catch (err) {
-      toast.error(err.message || 'Operation failed.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleEditSelect = t => {
-    setEditingId(t._id);
-    setNewTicket({
-      title: t.company || t.title,
-      type: t.type,
-      from: t.from,
-      to: t.to,
-      price: t.price,
-      seats: t.seats,
-      date: t.date || '',
-      time: t.time || '',
-      perks: t.perks || [],
-      image: t.image || '',
-    });
-    setActiveTab('add-ticket');
-  };
-
-  const handleDeleteTicket = async id => {
-    if (!confirm('Delete this travel ticket permanently?')) return;
-    try {
-      await apiRequest(`/tickets/${id}`, { method: 'DELETE' });
-      toast.success('Ticket deleted successfully.');
-      fetchData(user);
-    } catch (err) {
-      toast.error(err.message);
-    }
-  };
-
-  const handleBookingAction = async (id, status) => {
-    try {
-      await apiRequest(`/bookings/${id}/status`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status }),
-      });
-      toast.success(`Booking request marked as ${status}.`);
-      fetchData(user);
-    } catch (err) {
-      toast.error(err.message);
-    }
-  };
-
-  const handleTicketStatus = async (id, status) => {
-    try {
-      await apiRequest(`/tickets/${id}/status`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status }),
-      });
-      toast.success(`Ticket operation successfully ${status}.`);
-      fetchData(user);
-    } catch (err) {
-      toast.error(err.message);
-    }
-  };
-
-  const handleAdvertiseToggle = async (id, current) => {
-    try {
-      await apiRequest(`/tickets/${id}/advertise`, {
-        method: 'PATCH',
-        body: JSON.stringify({ advertised: !current }),
-      });
-      toast.success('Advertisement parameter updated.');
-      fetchData(user);
-    } catch (err) {
-      toast.error(err.message);
-    }
-  };
-
-  const handleUpdateRole = async (userId, role) => {
-    try {
-      await apiRequest(`/users/role/${userId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ role }),
-      });
-      toast.success(`User access role changed to ${role}.`);
-      fetchData(user);
-    } catch (err) {
-      toast.error(err.message);
-    }
-  };
-
-  const handleMarkAsFraud = async userId => {
-    if (!confirm('Flag this vendor as fraud? This hides all active fleets.'))
-      return;
-    try {
-      await apiRequest(`/users/fraud/${userId}`, { method: 'PATCH' });
-      toast.success('Vendor isolated and banned.');
-      fetchData(user);
-    } catch (err) {
-      toast.error(err.message);
-    }
-  };
-
-  const executeStripePayment = async e => {
-    e.preventDefault();
-    setPayLoading(true);
-    try {
-      await apiRequest('/payments/confirm', {
-        method: 'POST',
-        body: JSON.stringify({
-          bookingId: payTarget._id,
-          transactionId: 'ch_' + Math.random().toString(36).substr(2, 9),
-          ticketId: payTarget.ticketId,
-          finalPrice: payTarget.price,
-          ticketTitle: payTarget.company || payTarget.title,
-          userEmail: user.email,
-          quantity: payTarget.quantity,
-        }),
-      });
-      toast.success(
-        'Stripe Secure Gateway approved charge! Token synchronized.',
-      );
-      setPayTarget(null);
-      fetchData(user);
-    } catch (err) {
-      toast.error('Payment gateway rejected transaction authorization.');
-    } finally {
-      setPayLoading(false);
-    }
-  };
-
+  // ── FIX: Sidebar Items Function defined explicitly within Main Functional Scope ──
   const sidebarItems = () => {
     const base = [{ key: 'profile', label: 'My Profile' }];
     if (user?.role === 'user')
@@ -362,6 +161,250 @@ export default function DashboardPage() {
     return base;
   };
 
+  const fetchData = async u => {
+    try {
+      if (u.role === 'admin') {
+        const [users, tickets] = await Promise.all([
+          apiRequest('/users'),
+          apiRequest('/tickets/all'),
+        ]);
+        setAllUsers(users || []);
+        setAllTickets(tickets || []);
+      } else if (u.role === 'vendor') {
+        const [vt, rb] = await Promise.all([
+          apiRequest(`/tickets/vendor?email=${u.email}`),
+          apiRequest('/bookings/vendor'),
+        ]);
+        setVendorTickets(vt || []);
+        setRequestedBookings(rb || []);
+      } else {
+        const [bk, tx] = await Promise.all([
+          apiRequest(`/bookings?email=${u.email}`),
+          apiRequest(`/transactions?email=${u.email}`).catch(() => []),
+        ]);
+        setBookings(bk || []);
+        setTransactions(tx || []);
+      }
+    } catch (e) {
+      setError(e.message || 'Data stream synchronization error.');
+      toast.error(e.message || 'Data failed to update.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const stored = localStorage.getItem('user');
+    if (!stored) {
+      router.push('/login');
+      return;
+    }
+    const parsed = JSON.parse(stored);
+    setUser(parsed);
+    fetchData(parsed);
+  }, []);
+
+  const handleCreateOrUpdateTicket = async e => {
+    e.preventDefault();
+    setSubmitting(true);
+    const id = toast.loading('Publishing fleet configuration ledger...');
+    try {
+      const payload = {
+        ...newTicket,
+        price: Number(newTicket.price),
+        seats: Number(newTicket.seats),
+        company: newTicket.title,
+        vendorName: user.name,
+        vendorEmail: user.email,
+      };
+
+      if (editingId) {
+        await apiRequest(`/tickets/${editingId}`, {
+          method: 'PATCH',
+          body: JSON.stringify(payload),
+        });
+        toast.update(id, {
+          render: 'Ticket modified successfully! 🎉',
+          type: 'success',
+          isLoading: false,
+          autoClose: 3000,
+        });
+      } else {
+        await apiRequest('/tickets', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+        toast.update(id, {
+          render: 'Ticket queued for Admin Panel authorization! 🚀',
+          type: 'success',
+          isLoading: false,
+          autoClose: 3000,
+        });
+      }
+
+      setNewTicket(EMPTY_TICKET);
+      setEditingId(null);
+      fetchData(user);
+      setActiveTab('my-tickets');
+    } catch (err) {
+      toast.update(id, {
+        render: err.message || 'Operation rejected.',
+        type: 'error',
+        isLoading: false,
+        autoClose: 3000,
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleEditSelect = t => {
+    setEditingId(t._id);
+    setNewTicket({
+      title: t.company || t.title,
+      type: t.type,
+      from: t.from,
+      to: t.to,
+      price: t.price,
+      seats: t.seats,
+      date: t.date || '',
+      time: t.time || '',
+      perks: t.perks || [],
+      image: t.image || '',
+    });
+    setActiveTab('add-ticket');
+    toast.info('Loaded ticket data into form editor layout.');
+  };
+
+  const handleDeleteTicket = async id => {
+    if (!confirm('Delete this ticket listing?')) return;
+    try {
+      await apiRequest(`/tickets/${id}`, { method: 'DELETE' });
+      toast.success('Ticket layout removed from registry.');
+      fetchData(user);
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
+  const handleBookingAction = async (id, status) => {
+    try {
+      await apiRequest(`/bookings/${id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status }),
+      });
+      toast.success(`Booking operation safely marked as ${status}.`);
+      fetchData(user);
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
+  const handleTicketStatus = async (id, status) => {
+    try {
+      await apiRequest(`/tickets/${id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status }),
+      });
+      toast.success(`Ticket authorization status updated to: ${status}`);
+      fetchData(user);
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
+  const handleAdvertiseToggle = async (id, current) => {
+    try {
+      await apiRequest(`/tickets/${id}/advertise`, {
+        method: 'PATCH',
+        body: JSON.stringify({ advertised: !current }),
+      });
+      toast.success('Homepage advertisement matrix modified.');
+      fetchData(user);
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
+  const handleUpdateRole = async (userId, role) => {
+    try {
+      await apiRequest(`/users/role/${userId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ role }),
+      });
+      toast.success(`Target account upgraded to ${role}.`);
+      fetchData(user);
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
+  const handleMarkAsFraud = async userId => {
+    if (!confirm('Flag this vendor as fraud? This hides all active fleets.'))
+      return;
+    try {
+      await apiRequest(`/users/fraud/${userId}`, { method: 'PATCH' });
+      toast.warn('Vendor isolated and transit listings banned.');
+      fetchData(user);
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
+  const executeStripeSecurePayment = async e => {
+    e.preventDefault();
+    if (cardDetails.number.replace(/\s/g, '') !== '4242424242424242') {
+      toast.error(
+        'Invalid card digits! Please use Stripe test credentials (4242 x4).',
+      );
+      return;
+    }
+    setPayLoading(true);
+    const toastId = toast.loading(
+      'Authorizing secure Stripe intent pipeline...',
+    );
+    try {
+      const intent = await apiRequest('/create-payment-intent', {
+        method: 'POST',
+        body: JSON.stringify({ price: payTarget.price }),
+      });
+
+      if (intent.clientSecret) {
+        await apiRequest('/payments/confirm', {
+          method: 'POST',
+          body: JSON.stringify({
+            bookingId: payTarget._id,
+            transactionId:
+              'ch_' + Math.random().toString(36).substr(2, 9).toUpperCase(),
+            ticketId: payTarget.ticketId,
+            finalPrice: payTarget.price,
+            ticketTitle: payTarget.company || payTarget.title,
+            userEmail: user.email,
+            quantity: payTarget.quantity,
+          }),
+        });
+        toast.update(toastId, {
+          render: 'Stripe Payment Approved! Seat Inventory updated. 🎉',
+          type: 'success',
+          isLoading: false,
+          autoClose: 3000,
+        });
+        setPayTarget(null);
+        setCardDetails({ number: '', expiry: '', cvc: '', name: '' });
+        fetchData(user);
+      }
+    } catch (err) {
+      toast.update(toastId, {
+        render: 'Stripe API refused authorization.',
+        type: 'error',
+        isLoading: false,
+        autoClose: 3000,
+      });
+    } finally {
+      setPayLoading(false);
+    }
+  };
+
   const chartData = ['Bus', 'Train', 'Plane', 'Launch'].map(t => ({
     name: t,
     tickets: vendorTickets.filter(v => v.type === t).length,
@@ -381,7 +424,7 @@ export default function DashboardPage() {
         <div className="space-y-6">
           <div className="flex items-center gap-2 pb-4 border-b border-neutral-800">
             <LayoutDashboard className="w-5 h-5 text-emerald-500" />
-            <span className="font-bold tracking-wide">Workspace Panel</span>
+            <span className="font-bold tracking-wide">Workspace</span>
           </div>
           <nav className="flex flex-col gap-1.5">
             {sidebarItems().map(item => (
@@ -399,6 +442,7 @@ export default function DashboardPage() {
           onClick={() => {
             localStorage.clear();
             router.push('/login');
+            toast.success('Securely signed out of session.');
           }}
           className="flex items-center gap-2 text-sm text-neutral-500 hover:text-red-400 transition-colors mt-8 px-4 py-2.5 rounded-xl hover:bg-red-500/5"
         >
@@ -406,13 +450,13 @@ export default function DashboardPage() {
         </button>
       </aside>
 
-      {/* MAIN CONTAINER */}
+      {/* MAIN FRAME */}
       <main className="flex-1 p-6 md:p-10 space-y-8 overflow-y-auto">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[#1e1e1e] p-6 rounded-2xl border border-neutral-800 shadow-xl">
           <div>
             <h1 className="text-xl font-bold">Welcome back, {user?.name}!</h1>
             <p className="text-xs text-neutral-500 mt-1">
-              Identity Access Logged As:{' '}
+              Identity Context:{' '}
               <span className="font-mono text-neutral-300">{user?.email}</span>
             </p>
           </div>
@@ -421,15 +465,15 @@ export default function DashboardPage() {
 
         {activeTab === 'profile' && (
           <Card className="bg-[#1e1e1e] border border-neutral-800 p-6 rounded-2xl shadow-xl">
-            <h3 className="text-lg font-bold mb-6">Authorized User Profile</h3>
+            <h3 className="text-lg font-bold mb-6">Account Overview</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
               {[
-                { label: 'User Full Name', value: user?.name },
-                { label: 'Secure Email Reference', value: user?.email },
-                { label: 'Clearance Context', value: user?.role },
+                { label: 'Full Name', value: user?.name },
+                { label: 'Secure Email Address', value: user?.email },
+                { label: 'Clearance Role', value: user?.role },
                 {
-                  label: 'Database Ledger Status',
-                  value: 'Active Operational',
+                  label: 'Platform Ledger',
+                  value: 'Verified Active',
                   green: true,
                 },
               ].map(item => (
@@ -453,10 +497,10 @@ export default function DashboardPage() {
 
         {activeTab === 'booked' && user?.role === 'user' && (
           <div className="space-y-4">
-            <h3 className="text-lg font-bold">My Booked Tickets Ledger</h3>
+            <h3 className="text-lg font-bold">My Booked Tickets</h3>
             {bookings.length === 0 ? (
               <div className="bg-[#1e1e1e] border border-neutral-800 rounded-2xl p-12 text-center text-neutral-500">
-                No active ticket claims recorded.
+                No ticket purchases synced yet.
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -468,7 +512,7 @@ export default function DashboardPage() {
                     <div className="flex justify-between items-start">
                       <div>
                         <h4 className="font-bold text-white text-sm">
-                          {b.company || b.title || 'Fleet Transit'}
+                          {b.company || b.title}
                         </h4>
                         <p className="text-xs text-neutral-400 mt-0.5">
                           {b.route}
@@ -476,15 +520,15 @@ export default function DashboardPage() {
                       </div>
                       <Badge status={b.status} />
                     </div>
-                    <div className="text-xs text-neutral-500 border-t border-neutral-900/60 pt-3 space-y-1">
+                    <div className="text-xs text-neutral-500 border-t border-neutral-900/40 pt-3 space-y-1">
                       <p>
-                        Quantity:{' '}
+                        Seats Claimed:{' '}
                         <span className="text-white font-bold">
                           {b.quantity}
                         </span>
                       </p>
                       <p>
-                        Total Charge:{' '}
+                        Total Cost:{' '}
                         <span className="text-emerald-400 font-bold">
                           BDT {b.price}
                         </span>
@@ -496,8 +540,8 @@ export default function DashboardPage() {
                         onClick={() => setPayTarget(b)}
                         className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs w-full mt-2"
                       >
-                        <CreditCard className="w-3.5 h-3.5 mr-1" /> Pay Now —
-                        BDT {b.price}
+                        <CreditCard className="w-3.5 h-3.5 mr-1" /> Pay Via
+                        Stripe Gateway
                       </Button>
                     )}
                   </Card>
@@ -507,28 +551,69 @@ export default function DashboardPage() {
           </div>
         )}
 
+        {activeTab === 'transactions' && user?.role === 'user' && (
+          <div className="space-y-4">
+            <h3 className="text-lg font-bold">Transaction History</h3>
+            <Card className="bg-[#1e1e1e] border border-neutral-800 p-6 rounded-2xl shadow-xl overflow-x-auto">
+              {transactions.length === 0 ? (
+                <p className="text-neutral-500 text-center py-10">
+                  No verified transactions logged.
+                </p>
+              ) : (
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-neutral-900 text-neutral-400 text-xs uppercase font-mono">
+                    <tr>
+                      <th className="p-4">Stripe Reference Id</th>
+                      <th className="p-4">Amount</th>
+                      <th className="p-4">Fleet Title</th>
+                      <th className="p-4">Log Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {transactions.map(tx => (
+                      <tr
+                        key={tx._id}
+                        className="border-b border-neutral-900/40"
+                      >
+                        <td className="p-4 font-mono text-xs text-neutral-400">
+                          {tx.transactionId || tx._id}
+                        </td>
+                        <td className="p-4 font-black text-emerald-400">
+                          BDT {tx.amount}
+                        </td>
+                        <td className="p-4 text-xs">{tx.ticketTitle}</td>
+                        <td className="p-4 text-xs text-neutral-500">
+                          {new Date(tx.createdAt).toLocaleDateString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </Card>
+          </div>
+        )}
+
         {activeTab === 'add-ticket' && user?.role === 'vendor' && (
           <Card className="bg-[#1e1e1e] border border-neutral-800 p-6 rounded-2xl shadow-xl">
             <h2 className="text-lg font-bold flex items-center gap-2 mb-6">
               <PlusCircle className="w-5 h-5 text-emerald-500" />{' '}
-              {editingId
-                ? 'Modify Fleet Route Structure'
-                : 'Publish New Travel Operation'}
+              {editingId ? 'Edit Current Listing' : 'Publish New Operation'}
             </h2>
             <form onSubmit={handleCreateOrUpdateTicket} className="space-y-4">
               <input
                 required
-                placeholder="Ticket Carrier Title (e.g. SilkLine Express)"
+                placeholder="Carrier Identity Operator"
                 value={newTicket.title}
                 onChange={e =>
                   setNewTicket({ ...newTicket, title: e.target.value })
                 }
-                className="w-full h-11 bg-neutral-900 border border-neutral-800 rounded-xl px-4 text-sm text-white focus:border-emerald-500 outline-none"
+                className="w-full h-11 bg-neutral-900 border border-neutral-800 rounded-xl px-4 text-sm text-white outline-none"
               />
               <div className="grid grid-cols-2 gap-4">
                 <input
                   required
-                  placeholder="From Station"
+                  placeholder="From Terminal"
                   value={newTicket.from}
                   onChange={e =>
                     setNewTicket({ ...newTicket, from: e.target.value })
@@ -537,7 +622,7 @@ export default function DashboardPage() {
                 />
                 <input
                   required
-                  placeholder="To Destination"
+                  placeholder="To Terminal"
                   value={newTicket.to}
                   onChange={e =>
                     setNewTicket({ ...newTicket, to: e.target.value })
@@ -547,7 +632,7 @@ export default function DashboardPage() {
                 <input
                   required
                   type="number"
-                  placeholder="Fare Rate (BDT)"
+                  placeholder="Fare Rate BDT"
                   value={newTicket.price}
                   onChange={e =>
                     setNewTicket({ ...newTicket, price: e.target.value })
@@ -557,7 +642,7 @@ export default function DashboardPage() {
                 <input
                   required
                   type="number"
-                  placeholder="Total Seat Inventory"
+                  placeholder="Available Seating Units"
                   value={newTicket.seats}
                   onChange={e =>
                     setNewTicket({ ...newTicket, seats: e.target.value })
@@ -588,7 +673,7 @@ export default function DashboardPage() {
                 isLoading={submitting}
                 className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-11 rounded-xl mt-4"
               >
-                {editingId ? 'Save Route Changes' : 'Dispatch Ticket Request'}
+                {editingId ? 'Commit Modifications' : 'Create Transit Unit'}
               </Button>
             </form>
           </Card>
@@ -607,10 +692,10 @@ export default function DashboardPage() {
                   </h4>
                   <Badge status={t.status || 'pending'} />
                 </div>
-                <p className="text-xs text-neutral-400 font-mono">
+                <p className="text-xs text-neutral-400">
                   {t.from} → {t.to}
                 </p>
-                <div className="flex gap-2 mt-4 pt-2 border-t border-neutral-900/60">
+                <div className="flex gap-2 mt-auto pt-2 border-t border-neutral-900/40">
                   <Button
                     size="sm"
                     onClick={() => handleEditSelect(t)}
@@ -640,10 +725,10 @@ export default function DashboardPage() {
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="bg-neutral-900 text-xs text-neutral-400 uppercase">
-                  <th className="p-4">Passenger</th>
-                  <th className="p-4">Ticket</th>
-                  <th className="p-4">Total Price</th>
-                  <th className="p-4">Status</th>
+                  <th className="p-4">Buyer Identity</th>
+                  <th className="p-4">Ticket Name</th>
+                  <th className="p-4">Price Ledger</th>
+                  <th className="p-4">State</th>
                   <th className="p-4">Actions</th>
                 </tr>
               </thead>
@@ -658,9 +743,11 @@ export default function DashboardPage() {
                     </td>
                     <td className="p-4 text-xs">
                       {b.company || b.title}{' '}
-                      <span className="text-neutral-500">(x{b.quantity})</span>
+                      <span className="text-neutral-500 font-mono">
+                        (x{b.quantity})
+                      </span>
                     </td>
-                    <td className="p-4 text-emerald-400 font-bold">
+                    <td className="p-4 font-bold text-emerald-400">
                       BDT {b.price}
                     </td>
                     <td className="p-4">
@@ -700,15 +787,37 @@ export default function DashboardPage() {
           </Card>
         )}
 
+        {activeTab === 'revenue' && user?.role === 'vendor' && (
+          <Card className="bg-[#1e1e1e] border border-neutral-800 p-6 rounded-2xl shadow-xl">
+            <h3 className="text-lg font-bold mb-6">Revenue Analytics Chart</h3>
+            <div className="w-full h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#222" />
+                  <XAxis dataKey="name" stroke="#666" />
+                  <YAxis stroke="#666" />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#111',
+                      borderColor: '#333',
+                    }}
+                  />
+                  <Bar dataKey="tickets" fill="#10b981" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+        )}
+
         {activeTab === 'manage-tickets' && user?.role === 'admin' && (
           <Card className="bg-[#1e1e1e] border border-neutral-800 p-6 rounded-2xl shadow-xl overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="bg-neutral-900 text-xs text-neutral-400 uppercase">
-                  <th className="p-4">Operator</th>
-                  <th className="p-4">Route</th>
-                  <th className="p-4">Status</th>
-                  <th className="p-4">Actions</th>
+                  <th className="p-4">Fleet Operator</th>
+                  <th className="p-4">Terminal Route</th>
+                  <th className="p-4">System State</th>
+                  <th className="p-4">Action Pipeline</th>
                 </tr>
               </thead>
               <tbody>
@@ -761,9 +870,9 @@ export default function DashboardPage() {
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="bg-neutral-900 text-xs text-neutral-400 uppercase">
-                  <th className="p-4">User Identity</th>
-                  <th className="p-4">Role Context</th>
-                  <th className="p-4">Management Actions</th>
+                  <th className="p-4">Identity Ledger</th>
+                  <th className="p-4">System Role</th>
+                  <th className="p-4">Access Rules</th>
                 </tr>
               </thead>
               <tbody>
@@ -808,17 +917,17 @@ export default function DashboardPage() {
         {activeTab === 'advertise-tickets' && user?.role === 'admin' && (
           <Card className="bg-[#1e1e1e] border border-neutral-800 p-6 rounded-2xl shadow-xl overflow-x-auto">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold">Advertisement Manager</h3>
+              <h3 className="font-bold">Advertisement Matrix</h3>
               <span className="text-xs text-amber-400 font-mono">
-                {allTickets.filter(t => t.advertised).length} / 6 Active
+                {allTickets.filter(t => t.advertised).length} / 6 Slotted
               </span>
             </div>
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="bg-neutral-900 text-xs text-neutral-400">
-                  <th className="p-4">Transit Option</th>
-                  <th className="p-4">Status</th>
-                  <th className="p-4">Toggle Context</th>
+                  <th className="p-4">Transit Asset</th>
+                  <th className="p-4">Display Matrix</th>
+                  <th className="p-4">Toggle Pipeline</th>
                 </tr>
               </thead>
               <tbody>
@@ -834,7 +943,7 @@ export default function DashboardPage() {
                       </td>
                       <td className="p-4 font-bold text-xs">
                         {t.advertised ? (
-                          <span className="text-emerald-400">Active Ad</span>
+                          <span className="text-emerald-400">Active</span>
                         ) : (
                           <span className="text-neutral-500">Off</span>
                         )}
@@ -846,9 +955,7 @@ export default function DashboardPage() {
                           }
                           className={`text-xs font-bold px-3 py-1.5 rounded-xl border ${t.advertised ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'}`}
                         >
-                          {t.advertised
-                            ? 'Unadvertise'
-                            : 'Activate Advertisement'}
+                          {t.advertised ? 'Remove Slot' : 'Activate Slot'}
                         </button>
                       </td>
                     </tr>
@@ -859,66 +966,113 @@ export default function DashboardPage() {
         )}
       </main>
 
-      {/* STRIPE SECURE PAYMENT GATEWAY CARD MODAL INTERFACE */}
+      {/* STRIPE TEST ENVIRONMENT CARD FORM INTERFACE */}
       {payTarget && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
-          <div className="w-full max-w-md bg-[#1e1e1e] border border-neutral-800 p-6 rounded-2xl shadow-2xl space-y-5 animate-appearance-in">
-            <div>
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <CreditCard className="w-5 h-5 text-emerald-500" /> Stripe
-                Payment Gateway
-              </h3>
-              <p className="text-xs text-neutral-500 mt-1">
-                Complete transit clearance for{' '}
-                {payTarget.company || payTarget.title}
-              </p>
-            </div>
-            <form onSubmit={executeStripePayment} className="space-y-4">
+          <div className="w-full max-w-md bg-[#1e1e1e] border border-neutral-800 p-6 rounded-2xl shadow-2xl space-y-5">
+            <div className="flex justify-between items-start">
               <div>
-                <label className="text-[11px] uppercase font-bold text-neutral-400 tracking-wider block mb-1">
-                  Card Credentials (Stripe Sandbox)
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <CreditCard className="w-5 h-5 text-emerald-500" /> Stripe
+                  Secure Checkout
+                </h3>
+                <p className="text-xs text-neutral-500 mt-1">
+                  Authorized transaction endpoint for{' '}
+                  {payTarget.company || payTarget.title}
+                </p>
+              </div>
+              <div className="w-14 h-6 bg-neutral-900 rounded border border-neutral-800 flex items-center justify-center text-[9px] font-black tracking-widest text-neutral-400 select-none uppercase">
+                Stripe
+              </div>
+            </div>
+            <form onSubmit={executeStripeSecurePayment} className="space-y-4">
+              <div>
+                <label className="text-[10px] uppercase font-bold text-neutral-400 block mb-1">
+                  Stripe Sandbox Card Number
                 </label>
                 <input
-                  disabled
-                  value={stripeForm.card}
-                  className="w-full h-11 bg-neutral-900 border border-neutral-800 text-neutral-400 rounded-xl px-4 text-sm font-mono cursor-not-allowed"
+                  required
+                  placeholder="4242 4242 4242 4242"
+                  maxLength={19}
+                  value={cardDetails.number}
+                  onChange={e =>
+                    setCardDetails({
+                      ...cardDetails,
+                      number: e.target.value
+                        .replace(/\s?/g, '')
+                        .replace(/(\d{4})/g, '$1 ')
+                        .trim(),
+                    })
+                  }
+                  className="w-full h-11 bg-neutral-900 border border-neutral-800 text-white rounded-xl px-4 text-sm font-mono outline-none focus:border-emerald-500 font-bold"
                 />
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] uppercase font-bold text-neutral-400 block mb-1">
+                    Expiry Date
+                  </label>
+                  <input
+                    required
+                    placeholder="MM / YY"
+                    maxLength={5}
+                    value={cardDetails.expiry}
+                    onChange={e =>
+                      setCardDetails({ ...cardDetails, expiry: e.target.value })
+                    }
+                    className="w-full h-11 bg-neutral-900 border border-neutral-800 text-white rounded-xl px-4 text-sm font-mono outline-none focus:border-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase font-bold text-neutral-400 block mb-1">
+                    Secure CVC
+                  </label>
+                  <input
+                    required
+                    placeholder="123"
+                    maxLength={3}
+                    value={cardDetails.cvc}
+                    onChange={e =>
+                      setCardDetails({ ...cardDetails, cvc: e.target.value })
+                    }
+                    className="w-full h-11 bg-neutral-900 border border-neutral-800 text-white rounded-xl px-4 text-sm font-mono outline-none focus:border-emerald-500"
+                  />
+                </div>
+              </div>
               <div>
-                <label className="text-[11px] uppercase font-bold text-neutral-400 tracking-wider block mb-1">
+                <label className="text-[10px] uppercase font-bold text-neutral-400 block mb-1">
                   Card Holder Name
                 </label>
                 <input
                   required
                   placeholder="e.g. REEZ"
-                  value={stripeForm.holder}
+                  value={cardDetails.name}
                   onChange={e =>
-                    setStripeForm({ ...stripeForm, holder: e.target.value })
+                    setCardDetails({ ...cardDetails, name: e.target.value })
                   }
                   className="w-full h-11 bg-neutral-900 border border-neutral-800 text-white rounded-xl px-4 text-sm outline-none focus:border-emerald-500 font-bold"
                 />
               </div>
               <div className="bg-neutral-900/60 p-3 rounded-xl border border-neutral-900 flex justify-between items-center text-xs">
-                <span className="text-neutral-400">Total Charged Amount:</span>
+                <span className="text-neutral-400">Total Charged Invoice:</span>
                 <span className="text-emerald-400 font-black text-base">
                   BDT {payTarget.price}
                 </span>
               </div>
               <div className="flex gap-3 pt-2">
-                <Button
+                <button
                   type="button"
-                  variant="flat"
                   onClick={() => setPayTarget(null)}
-                  className="flex-1 bg-neutral-900 text-neutral-400 font-bold h-11 rounded-xl"
+                  className="flex-1 bg-neutral-900 text-neutral-400 text-xs font-bold h-11 rounded-xl border border-neutral-800 transition-colors hover:bg-neutral-800"
                 >
                   Cancel
-                </Button>
+                </button>
                 <Button
                   type="submit"
                   isLoading={payLoading}
-                  className="flex-1 bg-emerald-600 text-white font-bold h-11 rounded-xl shadow-lg shadow-emerald-950/40"
+                  className="flex-1 bg-emerald-600 text-white font-bold h-11 rounded-xl shadow-lg shadow-emerald-950/30"
                 >
-                  Authorize Payment
+                  Authorize BDT {payTarget.price}
                 </Button>
               </div>
             </form>

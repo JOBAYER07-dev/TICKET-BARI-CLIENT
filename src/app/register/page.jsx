@@ -6,10 +6,10 @@ import { User, Mail, Lock, UserCheck, Bus } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { apiRequest } from '@/utils/api';
+import { toast } from 'react-toastify';
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -20,20 +20,29 @@ export default function RegisterPage() {
 
   const handleSubmit = async e => {
     e.preventDefault();
-    setError('');
     setLoading(true);
-
+    const toastId = toast.loading('Creating secure passenger profile...');
     try {
       const data = await apiRequest('/register', {
         method: 'POST',
         body: JSON.stringify(formData),
       });
       if (data.success) {
-        alert('Registration successful! Please login.');
+        toast.update(toastId, {
+          render: 'Registration successful! Redirecting to login... 🎉',
+          type: 'success',
+          isLoading: false,
+          autoClose: 3000,
+        });
         router.push('/login');
       }
     } catch (err) {
-      setError(err.message || 'Registration failed. Try again.');
+      toast.update(toastId, {
+        render: err.message || 'Registration failed.',
+        type: 'error',
+        isLoading: false,
+        autoClose: 3000,
+      });
     } finally {
       setLoading(false);
     }
@@ -42,7 +51,6 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen bg-[#121212] text-white flex items-center justify-center px-6 py-12">
       <div className="w-full max-w-md bg-[#1e1e1e]/90 p-8 rounded-2xl border border-neutral-800 shadow-2xl backdrop-blur-md">
-        {/* Logo */}
         <div className="flex flex-col items-center text-center mb-8">
           <div className="flex items-center gap-2 font-bold text-2xl text-emerald-500 mb-2">
             <Bus className="w-7 h-7" />
@@ -56,14 +64,7 @@ export default function RegisterPage() {
           </p>
         </div>
 
-        {error && (
-          <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs font-medium text-center">
-            {error}
-          </div>
-        )}
-
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Name */}
           <div>
             <label className="text-xs font-semibold text-neutral-400 uppercase tracking-wider block mb-1.5">
               Full Name
@@ -78,12 +79,10 @@ export default function RegisterPage() {
                 onChange={e =>
                   setFormData({ ...formData, name: e.target.value })
                 }
-                className="w-full h-11 bg-neutral-900 border border-neutral-800 rounded-xl pl-10 pr-4 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-emerald-500 transition-colors"
+                className="w-full h-11 bg-neutral-900 border border-neutral-800 rounded-xl pl-10 pr-4 text-sm text-white placeholder-neutral-600 outline-none focus:border-emerald-500 transition-colors"
               />
             </div>
           </div>
-
-          {/* Email */}
           <div>
             <label className="text-xs font-semibold text-neutral-400 uppercase tracking-wider block mb-1.5">
               Email Address
@@ -98,12 +97,10 @@ export default function RegisterPage() {
                 onChange={e =>
                   setFormData({ ...formData, email: e.target.value })
                 }
-                className="w-full h-11 bg-neutral-900 border border-neutral-800 rounded-xl pl-10 pr-4 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-emerald-500 transition-colors"
+                className="w-full h-11 bg-neutral-900 border border-neutral-800 rounded-xl pl-10 pr-4 text-sm text-white placeholder-neutral-600 outline-none focus:border-emerald-500 transition-colors"
               />
             </div>
           </div>
-
-          {/* Password */}
           <div>
             <label className="text-xs font-semibold text-neutral-400 uppercase tracking-wider block mb-1.5">
               Password
@@ -119,12 +116,10 @@ export default function RegisterPage() {
                 onChange={e =>
                   setFormData({ ...formData, password: e.target.value })
                 }
-                className="w-full h-11 bg-neutral-900 border border-neutral-800 rounded-xl pl-10 pr-4 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-emerald-500 transition-colors"
+                className="w-full h-11 bg-neutral-900 border border-neutral-800 rounded-xl pl-10 pr-4 text-sm text-white placeholder-neutral-600 outline-none focus:border-emerald-500 transition-colors"
               />
             </div>
           </div>
-
-          {/* Role — ✅ Admin option removed for security */}
           <div>
             <label className="text-xs font-semibold text-neutral-400 uppercase tracking-wider block mb-1.5">
               Register As
@@ -136,25 +131,22 @@ export default function RegisterPage() {
                 onChange={e =>
                   setFormData({ ...formData, role: e.target.value })
                 }
-                className="w-full h-11 bg-neutral-900 border border-neutral-800 rounded-xl pl-10 pr-10 text-sm text-white focus:outline-none focus:border-emerald-500 transition-colors appearance-none cursor-pointer"
+                className="w-full h-11 bg-neutral-900 border border-neutral-800 rounded-xl pl-10 pr-10 text-sm text-white focus:border-emerald-500 appearance-none cursor-pointer"
               >
                 <option value="user">General User (Ticket Buyer)</option>
                 <option value="vendor">Transport Vendor (Ticket Seller)</option>
-                {/* Admin role is NOT selectable — assigned manually or via admin panel */}
               </select>
               <div className="absolute right-4 pointer-events-none w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-neutral-500" />
             </div>
           </div>
-
           <Button
             type="submit"
             isLoading={loading}
-            className="w-full h-11 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-sm tracking-wide mt-2 shadow-lg shadow-emerald-900/20"
+            className="w-full h-11 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-sm tracking-wide mt-2 shadow-lg"
           >
             Sign Up
           </Button>
         </form>
-
         <p className="text-center text-xs text-neutral-500 mt-6">
           Already have an account?{' '}
           <Link

@@ -5,7 +5,6 @@ import { Bus, Mail, Phone } from 'lucide-react';
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
-
   return (
     <footer className="bg-[#121212] border-t border-neutral-800 text-neutral-400 pt-12 pb-6 w-full">
       <div className="max-w-[1280px] mx-auto px-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
@@ -21,7 +20,6 @@ export default function Footer() {
             Book bus, train, launch & flight tickets easily.
           </p>
         </div>
-
         <div>
           <h4 className="text-white font-semibold text-[15px] mb-4 tracking-wide">
             Quick Links
@@ -58,10 +56,9 @@ export default function Footer() {
             </li>
           </ul>
         </div>
-
         <div>
           <h4 className="text-white font-semibold text-[15px] mb-4 tracking-wide">
-            Contact
+            Contact Info
           </h4>
           <ul className="flex flex-col gap-3 text-sm">
             <li className="flex items-center gap-2">
@@ -82,7 +79,6 @@ export default function Footer() {
                 +8801861961550
               </a>
             </li>
-
             <li className="flex items-center gap-2 mt-1">
               <svg
                 viewBox="0 0 24 24"
@@ -102,22 +98,24 @@ export default function Footer() {
             </li>
           </ul>
         </div>
-
         <div>
           <h4 className="text-white font-semibold text-[15px] mb-4 tracking-wide">
-            Payment
+            Payment Channels
           </h4>
-          <p className="text-sm mb-2">
-            Powered by <span className="text-white font-semibold">Stripe</span>
+          <p className="text-xs mb-3 text-neutral-500 leading-relaxed">
+            Powered by globally verified encrypted gateways.
           </p>
-          <div className="w-16 h-7 bg-neutral-900 rounded flex items-center justify-center text-[11px] text-white font-bold tracking-widest uppercase border border-neutral-800 select-none shadow-sm">
-            Stripe
+
+          {/* 🎯 ULTRA-STABLE ZERO-IMAGE STRIPE BRAND BADGE */}
+          <div className="flex items-center justify-center bg-white/[0.03] border border-neutral-800/80 rounded-xl px-4 py-1.5 w-fit shadow-md select-none">
+            <span className="text-xl font-black tracking-tight select-none bg-gradient-to-r from-[#635BFF] via-[#7a73ff] to-[#635BFF] bg-clip-text text-transparent font-sans">
+              stripe
+            </span>
           </div>
         </div>
       </div>
-
-      <div className="max-w-[1280px] mx-auto px-6 mt-12 pt-6 border-t border-neutral-950 text-center text-xs tracking-wide">
-        <p>© {currentYear} TicketBari. All rights reserved.</p>
+      <div className="max-w-[1280px] mx-auto px-6 mt-12 pt-6 border-t border-neutral-900 text-center text-xs tracking-wide">
+        <p>&copy; {currentYear} TicketBari. All rights reserved.</p>
       </div>
     </footer>
   );
