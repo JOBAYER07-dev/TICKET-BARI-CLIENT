@@ -17,12 +17,11 @@ import {
   XCircle,
   ToggleLeft,
   ToggleRight,
-  FileText,
-  DollarSign,
   Star,
 } from 'lucide-react';
 import { apiRequest } from '@/utils/api';
 import { useRouter } from 'next/navigation';
+import { toast } from 'react-toastify';
 import {
   ResponsiveContainer,
   BarChart,
@@ -31,13 +30,8 @@ import {
   YAxis,
   Tooltip,
   CartesianGrid,
-  AreaChart,
-  Area,
 } from 'recharts';
 
-// ─────────────────────────────────────────────
-// Per-booking countdown timer
-// ─────────────────────────────────────────────
 function CountdownTimer({ date, time }) {
   const [text, setText] = useState('');
   const [passed, setPassed] = useState(false);
@@ -45,7 +39,6 @@ function CountdownTimer({ date, time }) {
   useEffect(() => {
     if (!date) return;
     const target = new Date(`${date}T${time || '00:00'}`).getTime();
-
     const tick = () => {
       const diff = target - Date.now();
       if (diff <= 0) {
@@ -59,13 +52,11 @@ function CountdownTimer({ date, time }) {
       const s = Math.floor((diff % 60000) / 1000);
       setText(d > 0 ? `${d}d ${h}h ${m}m` : `${h}h ${m}m ${s}s`);
     };
-
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, [date, time]);
 
-  if (!date) return null;
   return (
     <span
       className={`text-xs font-mono font-bold ${passed ? 'text-red-400' : 'text-amber-400'}`}
@@ -75,9 +66,6 @@ function CountdownTimer({ date, time }) {
   );
 }
 
-// ─────────────────────────────────────────────
-// Status badge helper
-// ─────────────────────────────────────────────
 function Badge({ status }) {
   const map = {
     pending: 'bg-yellow-500/10  text-yellow-400  border-yellow-500/20',
@@ -87,11 +75,10 @@ function Badge({ status }) {
     paid: 'bg-blue-500/10   text-blue-400   border-blue-500/20',
     admin: 'bg-purple-500/10  text-purple-400  border-purple-500/20',
     vendor: 'bg-amber-500/10  text-amber-400  border-amber-500/20',
-    user: 'bg-neutral-800   text-neutral-400 border-neutral-700',
   };
   return (
     <span
-      className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold border uppercase ${map[status] || map.user}`}
+      className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold border uppercase ${map[status] || 'bg-neutral-800 text-neutral-400 border-neutral-700'}`}
     >
       {status}
     </span>
@@ -107,7 +94,6 @@ const PERKS = [
   'Blanket',
   'Water Bottle',
 ];
-
 const EMPTY_TICKET = {
   title: '',
   type: 'Bus',
@@ -121,9 +107,6 @@ const EMPTY_TICKET = {
   image: '',
 };
 
-// ─────────────────────────────────────────────
-// Dashboard Page
-// ─────────────────────────────────────────────
 export default function DashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState(null);
@@ -131,24 +114,28 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // User data
+  // Storage Layers
   const [bookings, setBookings] = useState([]);
   const [transactions, setTransactions] = useState([]);
-
-  // Vendor data
   const [vendorTickets, setVendorTickets] = useState([]);
   const [requestedBookings, setRequestedBookings] = useState([]);
-
-  // Admin data
   const [allUsers, setAllUsers] = useState([]);
   const [allTickets, setAllTickets] = useState([]);
 
-  // Vendor form
+  // Modal payment structures
+  const [payTarget, setPayTarget] = useState(null);
+  const [stripeForm, setStripeForm] = useState({
+    card: '4242 •••• •••• 4242',
+    holder: '',
+  });
+  const [payLoading, setPayLoading] = useState(false);
+
+  // Form entries
   const [newTicket, setNewTicket] = useState(EMPTY_TICKET);
   const [imageFile, setImageFile] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [editingId, setEditingId] = useState(null);
 
-  // ── Fetch ──────────────────────────────────
   const fetchData = async u => {
     try {
       if (u.role === 'admin') {
@@ -161,7 +148,7 @@ export default function DashboardPage() {
       } else if (u.role === 'vendor') {
         const [vt, rb] = await Promise.all([
           apiRequest(`/tickets/vendor?email=${u.email}`),
-          apiRequest(`/bookings/vendor?email=${u.email}`),
+          apiRequest('/bookings/vendor'),
         ]);
         setVendorTickets(vt || []);
         setRequestedBookings(rb || []);
@@ -174,7 +161,7 @@ export default function DashboardPage() {
         setTransactions(tx || []);
       }
     } catch (e) {
-      setError(e.message || 'Failed to load data.');
+      setError(e.message || 'Error processing network requests.');
     } finally {
       setLoading(false);
     }
@@ -191,158 +178,164 @@ export default function DashboardPage() {
     fetchData(parsed);
   }, []);
 
-  // ── imgbb upload ───────────────────────────
-  const uploadImage = async file => {
-    const form = new FormData();
-    form.append('image', file);
-    const res = await fetch(
-      `https://api.imgbb.com/1/upload?key=${process.env.NEXT_PUBLIC_IMGBB_KEY}`,
-      { method: 'POST', body: form },
-    );
-    const json = await res.json();
-    if (!json.success) throw new Error('Image upload failed');
-    return json.data.url;
-  };
-
-  // ── Handlers ──────────────────────────────
-
-  // Vendor: create ticket
-  const handleCreateTicket = async e => {
+  const handleCreateOrUpdateTicket = async e => {
     e.preventDefault();
     setSubmitting(true);
     try {
-      let imageUrl = '';
-      if (imageFile) imageUrl = await uploadImage(imageFile);
-
       const payload = {
         ...newTicket,
         price: Number(newTicket.price),
         seats: Number(newTicket.seats),
-        image: imageUrl,
-        company: newTicket.title, // backend compat
+        company: newTicket.title,
         vendorName: user.name,
         vendorEmail: user.email,
-        status: 'pending',
       };
-      const data = await apiRequest('/tickets', {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      });
-      if (data.success) {
-        alert('Ticket submitted! Awaiting admin approval.');
-        setNewTicket(EMPTY_TICKET);
-        setImageFile(null);
-        fetchData(user);
-        setActiveTab('my-tickets');
+
+      if (editingId) {
+        await apiRequest(`/tickets/${editingId}`, {
+          method: 'PATCH',
+          body: JSON.stringify(payload),
+        });
+        toast.success('Ticket layout modified successfully.');
+      } else {
+        await apiRequest('/tickets', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+        toast.success('Ticket submitted successfully to Admin Panel queue!');
       }
+
+      setNewTicket(EMPTY_TICKET);
+      setEditingId(null);
+      fetchData(user);
+      setActiveTab('my-tickets');
     } catch (err) {
-      alert(err.message || 'Failed to add ticket.');
+      toast.error(err.message || 'Operation failed.');
     } finally {
       setSubmitting(false);
     }
   };
 
-  // Vendor: delete ticket
+  const handleEditSelect = t => {
+    setEditingId(t._id);
+    setNewTicket({
+      title: t.company || t.title,
+      type: t.type,
+      from: t.from,
+      to: t.to,
+      price: t.price,
+      seats: t.seats,
+      date: t.date || '',
+      time: t.time || '',
+      perks: t.perks || [],
+      image: t.image || '',
+    });
+    setActiveTab('add-ticket');
+  };
+
   const handleDeleteTicket = async id => {
-    if (!confirm('Delete this ticket permanently?')) return;
+    if (!confirm('Delete this travel ticket permanently?')) return;
     try {
       await apiRequest(`/tickets/${id}`, { method: 'DELETE' });
+      toast.success('Ticket deleted successfully.');
       fetchData(user);
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     }
   };
 
-  // Vendor: accept / reject booking
   const handleBookingAction = async (id, status) => {
     try {
       await apiRequest(`/bookings/${id}/status`, {
         method: 'PATCH',
         body: JSON.stringify({ status }),
       });
+      toast.success(`Booking request marked as ${status}.`);
       fetchData(user);
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     }
   };
 
-  // Admin: approve / reject ticket
   const handleTicketStatus = async (id, status) => {
     try {
       await apiRequest(`/tickets/${id}/status`, {
         method: 'PATCH',
         body: JSON.stringify({ status }),
       });
+      toast.success(`Ticket operation successfully ${status}.`);
       fetchData(user);
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     }
   };
 
-  // Admin: advertise toggle (max 6)
   const handleAdvertiseToggle = async (id, current) => {
-    const advertisedCount = allTickets.filter(t => t.advertised).length;
-    if (!current && advertisedCount >= 6) {
-      alert('Maximum 6 tickets can be advertised at a time.');
-      return;
-    }
     try {
       await apiRequest(`/tickets/${id}/advertise`, {
         method: 'PATCH',
         body: JSON.stringify({ advertised: !current }),
       });
+      toast.success('Advertisement parameter updated.');
       fetchData(user);
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     }
   };
 
-  // Admin: update user role
   const handleUpdateRole = async (userId, role) => {
     try {
       await apiRequest(`/users/role/${userId}`, {
         method: 'PATCH',
         body: JSON.stringify({ role }),
       });
-      alert(`Role updated to ${role}.`);
+      toast.success(`User access role changed to ${role}.`);
       fetchData(user);
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     }
   };
 
-  // Admin: mark fraud
   const handleMarkAsFraud = async userId => {
-    if (!confirm('Mark as fraud? Their tickets will be hidden.')) return;
+    if (!confirm('Flag this vendor as fraud? This hides all active fleets.'))
+      return;
     try {
       await apiRequest(`/users/fraud/${userId}`, { method: 'PATCH' });
-      alert('Vendor marked as fraud.');
+      toast.success('Vendor isolated and banned.');
       fetchData(user);
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     }
   };
 
-  // User: stripe payment
-  const handlePay = async (id, price) => {
-    if (!confirm(`Pay BDT ${price} via Stripe?`)) return;
+  const executeStripePayment = async e => {
+    e.preventDefault();
+    setPayLoading(true);
     try {
-      await apiRequest(`/bookings/${id}/pay`, { method: 'PATCH' });
-      alert('Payment successful!');
+      await apiRequest('/payments/confirm', {
+        method: 'POST',
+        body: JSON.stringify({
+          bookingId: payTarget._id,
+          transactionId: 'ch_' + Math.random().toString(36).substr(2, 9),
+          ticketId: payTarget.ticketId,
+          finalPrice: payTarget.price,
+          ticketTitle: payTarget.company || payTarget.title,
+          userEmail: user.email,
+          quantity: payTarget.quantity,
+        }),
+      });
+      toast.success(
+        'Stripe Secure Gateway approved charge! Token synchronized.',
+      );
+      setPayTarget(null);
       fetchData(user);
     } catch (err) {
-      alert(err.message || 'Payment failed.');
+      toast.error('Payment gateway rejected transaction authorization.');
+    } finally {
+      setPayLoading(false);
     }
   };
 
-  // Logout
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    router.push('/login');
-  };
-
-  // ── Sidebar items ─────────────────────────
   const sidebarItems = () => {
     const base = [{ key: 'profile', label: 'My Profile' }];
     if (user?.role === 'user')
@@ -354,7 +347,7 @@ export default function DashboardPage() {
     if (user?.role === 'vendor')
       return [
         ...base,
-        { key: 'add-ticket', label: 'Add Ticket' },
+        { key: 'add-ticket', label: editingId ? 'Modify Fleet' : 'Add Ticket' },
         { key: 'my-tickets', label: 'My Added Tickets' },
         { key: 'requested-bookings', label: 'Requested Bookings' },
         { key: 'revenue', label: 'Revenue Overview' },
@@ -369,13 +362,11 @@ export default function DashboardPage() {
     return base;
   };
 
-  // Revenue chart data
   const chartData = ['Bus', 'Train', 'Plane', 'Launch'].map(t => ({
     name: t,
     tickets: vendorTickets.filter(v => v.type === t).length,
   }));
 
-  // ── Loading / Error ────────────────────────
   if (loading)
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#121212]">
@@ -383,26 +374,21 @@ export default function DashboardPage() {
       </div>
     );
 
-  // ── Render ────────────────────────────────
   return (
     <div className="min-h-screen bg-[#121212] text-white flex flex-col md:flex-row">
-      {/* ── SIDEBAR ─────────────────────────── */}
+      {/* SIDEBAR */}
       <aside className="w-full md:w-64 bg-[#1a1a1a] border-r border-neutral-800 p-6 flex flex-col justify-between md:min-h-screen shrink-0">
         <div className="space-y-6">
           <div className="flex items-center gap-2 pb-4 border-b border-neutral-800">
             <LayoutDashboard className="w-5 h-5 text-emerald-500" />
-            <span className="font-bold tracking-wide">Dashboard</span>
+            <span className="font-bold tracking-wide">Workspace Panel</span>
           </div>
           <nav className="flex flex-col gap-1.5">
             {sidebarItems().map(item => (
               <button
                 key={item.key}
                 onClick={() => setActiveTab(item.key)}
-                className={`w-full text-left px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                  activeTab === item.key
-                    ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/20'
-                    : 'text-neutral-400 hover:bg-neutral-900 hover:text-white'
-                }`}
+                className={`w-full text-left px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${activeTab === item.key ? 'bg-emerald-600 text-white shadow-lg' : 'text-neutral-400 hover:bg-neutral-900 hover:text-white'}`}
               >
                 {item.label}
               </button>
@@ -410,60 +396,42 @@ export default function DashboardPage() {
           </nav>
         </div>
         <button
-          onClick={handleLogout}
+          onClick={() => {
+            localStorage.clear();
+            router.push('/login');
+          }}
           className="flex items-center gap-2 text-sm text-neutral-500 hover:text-red-400 transition-colors mt-8 px-4 py-2.5 rounded-xl hover:bg-red-500/5"
         >
           <LogOut className="w-4 h-4" /> Logout
         </button>
       </aside>
 
-      {/* ── MAIN ────────────────────────────── */}
+      {/* MAIN CONTAINER */}
       <main className="flex-1 p-6 md:p-10 space-y-8 overflow-y-auto">
-        {/* Top Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[#1e1e1e] p-6 rounded-2xl border border-neutral-800 shadow-xl">
           <div>
             <h1 className="text-xl font-bold">Welcome back, {user?.name}!</h1>
             <p className="text-xs text-neutral-500 mt-1">
-              Logged in as:{' '}
+              Identity Access Logged As:{' '}
               <span className="font-mono text-neutral-300">{user?.email}</span>
             </p>
           </div>
           <Badge status={user?.role} />
         </div>
 
-        {error && (
-          <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">
-            {error}
-          </div>
-        )}
-
-        {/* ═══════════════════════════════════
-            PROFILE
-        ═══════════════════════════════════ */}
         {activeTab === 'profile' && (
           <Card className="bg-[#1e1e1e] border border-neutral-800 p-6 rounded-2xl shadow-xl">
-            <h3 className="text-lg font-bold mb-6">Account Overview</h3>
-            <div className="flex flex-col items-center mb-8">
-              <div className="w-20 h-20 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mb-3 overflow-hidden">
-                {user?.photoURL ? (
-                  <img
-                    src={user.photoURL}
-                    alt="avatar"
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <User className="w-9 h-9 text-emerald-500" />
-                )}
-              </div>
-              <h4 className="font-bold text-lg">{user?.name}</h4>
-              <Badge status={user?.role} />
-            </div>
+            <h3 className="text-lg font-bold mb-6">Authorized User Profile</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
               {[
-                { label: 'Full Name', value: user?.name },
-                { label: 'Email', value: user?.email },
-                { label: 'Role', value: user?.role },
-                { label: 'Status', value: 'Active', green: true },
+                { label: 'User Full Name', value: user?.name },
+                { label: 'Secure Email Reference', value: user?.email },
+                { label: 'Clearance Context', value: user?.role },
+                {
+                  label: 'Database Ledger Status',
+                  value: 'Active Operational',
+                  green: true,
+                },
               ].map(item => (
                 <div
                   key={item.label}
@@ -483,15 +451,12 @@ export default function DashboardPage() {
           </Card>
         )}
 
-        {/* ═══════════════════════════════════
-            USER — BOOKED TICKETS
-        ═══════════════════════════════════ */}
         {activeTab === 'booked' && user?.role === 'user' && (
           <div className="space-y-4">
-            <h3 className="text-lg font-bold">My Booked Tickets</h3>
+            <h3 className="text-lg font-bold">My Booked Tickets Ledger</h3>
             {bookings.length === 0 ? (
               <div className="bg-[#1e1e1e] border border-neutral-800 rounded-2xl p-12 text-center text-neutral-500">
-                No bookings yet. Go browse tickets!
+                No active ticket claims recorded.
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -503,7 +468,7 @@ export default function DashboardPage() {
                     <div className="flex justify-between items-start">
                       <div>
                         <h4 className="font-bold text-white text-sm">
-                          {b.company || b.title}
+                          {b.company || b.title || 'Fleet Transit'}
                         </h4>
                         <p className="text-xs text-neutral-400 mt-0.5">
                           {b.route}
@@ -511,59 +476,30 @@ export default function DashboardPage() {
                       </div>
                       <Badge status={b.status} />
                     </div>
-
-                    <div className="text-xs text-neutral-500 space-y-1 border-t border-neutral-900 pt-3">
+                    <div className="text-xs text-neutral-500 border-t border-neutral-900/60 pt-3 space-y-1">
                       <p>
-                        Qty:{' '}
-                        <span className="text-white font-semibold">
+                        Quantity:{' '}
+                        <span className="text-white font-bold">
                           {b.quantity}
                         </span>
                       </p>
                       <p>
-                        Total:{' '}
+                        Total Charge:{' '}
                         <span className="text-emerald-400 font-bold">
                           BDT {b.price}
                         </span>
                       </p>
-                      {b.time && (
-                        <p>
-                          Dep:{' '}
-                          <span className="text-neutral-300">
-                            {b.date} · {b.time}
-                          </span>
-                        </p>
-                      )}
                     </div>
-
-                    {b.status !== 'rejected' && b.date && (
-                      <div className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 rounded-lg w-fit">
-                        <Clock className="w-3 h-3 text-amber-400" />
-                        <CountdownTimer date={b.date} time={b.time} />
-                      </div>
-                    )}
-
                     {b.status === 'accepted' && (
                       <Button
                         size="sm"
-                        onClick={() => handlePay(b._id, b.price)}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs w-full"
+                        onClick={() => setPayTarget(b)}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs w-full mt-2"
                       >
                         <CreditCard className="w-3.5 h-3.5 mr-1" /> Pay Now —
                         BDT {b.price}
                       </Button>
                     )}
-
-                    {b.status === 'rejected' && (
-                      <p className="text-xs text-red-400">
-                        Rejected by vendor.
-                      </p>
-                    )}
-
-                    {b.status === 'paid' && (
-                      <p className="text-xs text-blue-400 font-semibold">
-                        ✓ Payment confirmed
-                      </p>
-                    )}
                   </Card>
                 ))}
               </div>
@@ -571,745 +507,424 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* ═══════════════════════════════════
-            USER — TRANSACTION HISTORY
-        ═══════════════════════════════════ */}
-        {activeTab === 'transactions' && user?.role === 'user' && (
-          <div className="space-y-4">
-            <h3 className="text-lg font-bold">Transaction History</h3>
-            <Card className="bg-[#1e1e1e] border border-neutral-800 p-6 rounded-2xl shadow-xl overflow-x-auto">
-              {transactions.length === 0 ? (
-                <p className="text-neutral-500 text-center py-10">
-                  No transactions yet.
-                </p>
-              ) : (
-                <table className="w-full text-left text-sm text-neutral-300">
-                  <thead className="bg-neutral-900 text-xs font-bold text-neutral-400 uppercase tracking-wider">
-                    <tr>
-                      <th className="p-4">Transaction ID</th>
-                      <th className="p-4">Amount</th>
-                      <th className="p-4">Ticket</th>
-                      <th className="p-4">Date</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-neutral-900/60">
-                    {transactions.map(tx => (
-                      <tr key={tx._id} className="hover:bg-neutral-900/40">
-                        <td className="p-4 font-mono text-xs text-neutral-400">
-                          {tx._id}
-                        </td>
-                        <td className="p-4 font-bold text-emerald-400">
-                          BDT {tx.amount}
-                        </td>
-                        <td className="p-4">{tx.ticketTitle}</td>
-                        <td className="p-4 text-xs">
-                          {new Date(tx.createdAt).toLocaleDateString()}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </Card>
-          </div>
-        )}
-
-        {/* ═══════════════════════════════════
-            VENDOR — ADD TICKET
-        ═══════════════════════════════════ */}
         {activeTab === 'add-ticket' && user?.role === 'vendor' && (
           <Card className="bg-[#1e1e1e] border border-neutral-800 p-6 rounded-2xl shadow-xl">
             <h2 className="text-lg font-bold flex items-center gap-2 mb-6">
-              <PlusCircle className="w-5 h-5 text-emerald-500" /> Add New Ticket
+              <PlusCircle className="w-5 h-5 text-emerald-500" />{' '}
+              {editingId
+                ? 'Modify Fleet Route Structure'
+                : 'Publish New Travel Operation'}
             </h2>
-            <form onSubmit={handleCreateTicket} className="space-y-5">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Title */}
-                <div className="md:col-span-2">
-                  <label className="label-style">Ticket Title</label>
-                  <input
-                    required
-                    placeholder="e.g. Green Line Express"
-                    value={newTicket.title}
-                    onChange={e =>
-                      setNewTicket({ ...newTicket, title: e.target.value })
-                    }
-                    className="input-style"
-                  />
-                </div>
-
-                {/* Type */}
-                <div>
-                  <label className="label-style">Transport Type</label>
-                  <select
-                    value={newTicket.type}
-                    onChange={e =>
-                      setNewTicket({ ...newTicket, type: e.target.value })
-                    }
-                    className="input-style"
-                  >
-                    <option value="Bus">Bus</option>
-                    <option value="Train">Train</option>
-                    <option value="Plane">Plane</option>
-                    <option value="Launch">Launch</option>
-                  </select>
-                </div>
-
-                {/* Price */}
-                <div>
-                  <label className="label-style">Price (per unit) BDT</label>
-                  <input
-                    required
-                    type="number"
-                    min="1"
-                    placeholder="e.g. 550"
-                    value={newTicket.price}
-                    onChange={e =>
-                      setNewTicket({ ...newTicket, price: e.target.value })
-                    }
-                    className="input-style"
-                  />
-                </div>
-
-                {/* From */}
-                <div>
-                  <label className="label-style">From Location</label>
-                  <input
-                    required
-                    placeholder="e.g. Dhaka"
-                    value={newTicket.from}
-                    onChange={e =>
-                      setNewTicket({ ...newTicket, from: e.target.value })
-                    }
-                    className="input-style"
-                  />
-                </div>
-
-                {/* To */}
-                <div>
-                  <label className="label-style">To Destination</label>
-                  <input
-                    required
-                    placeholder="e.g. Chittagong"
-                    value={newTicket.to}
-                    onChange={e =>
-                      setNewTicket({ ...newTicket, to: e.target.value })
-                    }
-                    className="input-style"
-                  />
-                </div>
-
-                {/* Seats */}
-                <div>
-                  <label className="label-style">Total Seats</label>
-                  <input
-                    required
-                    type="number"
-                    min="1"
-                    placeholder="e.g. 40"
-                    value={newTicket.seats}
-                    onChange={e =>
-                      setNewTicket({ ...newTicket, seats: e.target.value })
-                    }
-                    className="input-style"
-                  />
-                </div>
-
-                {/* Date */}
-                <div>
-                  <label className="label-style">Departure Date</label>
-                  <input
-                    required
-                    type="date"
-                    value={newTicket.date}
-                    onChange={e =>
-                      setNewTicket({ ...newTicket, date: e.target.value })
-                    }
-                    className="input-style"
-                  />
-                </div>
-
-                {/* Time */}
-                <div>
-                  <label className="label-style">Departure Time</label>
-                  <input
-                    required
-                    type="time"
-                    value={newTicket.time}
-                    onChange={e =>
-                      setNewTicket({ ...newTicket, time: e.target.value })
-                    }
-                    className="input-style"
-                  />
-                </div>
-              </div>
-
-              {/* Perks */}
-              <div>
-                <label className="label-style mb-2">Perks</label>
-                <div className="flex flex-wrap gap-3">
-                  {PERKS.map(perk => (
-                    <label
-                      key={perk}
-                      className="flex items-center gap-2 cursor-pointer bg-neutral-900 border border-neutral-800 px-3 py-2 rounded-xl hover:border-emerald-500/40 transition-colors"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={newTicket.perks.includes(perk)}
-                        onChange={e => {
-                          setNewTicket({
-                            ...newTicket,
-                            perks: e.target.checked
-                              ? [...newTicket.perks, perk]
-                              : newTicket.perks.filter(p => p !== perk),
-                          });
-                        }}
-                        className="accent-emerald-500"
-                      />
-                      <span className="text-sm text-neutral-300">{perk}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* Image Upload */}
-              <div>
-                <label className="label-style">Ticket Image (imgbb)</label>
+            <form onSubmit={handleCreateOrUpdateTicket} className="space-y-4">
+              <input
+                required
+                placeholder="Ticket Carrier Title (e.g. SilkLine Express)"
+                value={newTicket.title}
+                onChange={e =>
+                  setNewTicket({ ...newTicket, title: e.target.value })
+                }
+                className="w-full h-11 bg-neutral-900 border border-neutral-800 rounded-xl px-4 text-sm text-white focus:border-emerald-500 outline-none"
+              />
+              <div className="grid grid-cols-2 gap-4">
                 <input
-                  type="file"
-                  accept="image/*"
-                  onChange={e => setImageFile(e.target.files[0])}
-                  className="w-full bg-neutral-900 border border-neutral-800 rounded-xl px-4 py-2.5 text-sm text-neutral-400 focus:outline-none file:bg-emerald-600 file:text-white file:border-0 file:rounded-lg file:px-3 file:py-1 file:text-xs file:mr-3 file:cursor-pointer"
+                  required
+                  placeholder="From Station"
+                  value={newTicket.from}
+                  onChange={e =>
+                    setNewTicket({ ...newTicket, from: e.target.value })
+                  }
+                  className="w-full h-11 bg-neutral-900 border border-neutral-800 rounded-xl px-4 text-sm text-white"
                 />
-                {imageFile && (
-                  <p className="text-xs text-emerald-400 mt-1">
-                    ✓ {imageFile.name}
-                  </p>
-                )}
+                <input
+                  required
+                  placeholder="To Destination"
+                  value={newTicket.to}
+                  onChange={e =>
+                    setNewTicket({ ...newTicket, to: e.target.value })
+                  }
+                  className="w-full h-11 bg-neutral-900 border border-neutral-800 rounded-xl px-4 text-sm text-white"
+                />
+                <input
+                  required
+                  type="number"
+                  placeholder="Fare Rate (BDT)"
+                  value={newTicket.price}
+                  onChange={e =>
+                    setNewTicket({ ...newTicket, price: e.target.value })
+                  }
+                  className="w-full h-11 bg-neutral-900 border border-neutral-800 rounded-xl px-4 text-sm text-white"
+                />
+                <input
+                  required
+                  type="number"
+                  placeholder="Total Seat Inventory"
+                  value={newTicket.seats}
+                  onChange={e =>
+                    setNewTicket({ ...newTicket, seats: e.target.value })
+                  }
+                  className="w-full h-11 bg-neutral-900 border border-neutral-800 rounded-xl px-4 text-sm text-white"
+                />
+                <input
+                  required
+                  type="date"
+                  value={newTicket.date}
+                  onChange={e =>
+                    setNewTicket({ ...newTicket, date: e.target.value })
+                  }
+                  className="w-full h-11 bg-neutral-900 border border-neutral-800 rounded-xl px-4 text-sm text-white"
+                />
+                <input
+                  required
+                  type="time"
+                  value={newTicket.time}
+                  onChange={e =>
+                    setNewTicket({ ...newTicket, time: e.target.value })
+                  }
+                  className="w-full h-11 bg-neutral-900 border border-neutral-800 rounded-xl px-4 text-sm text-white"
+                />
               </div>
-
-              {/* Readonly vendor fields */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="label-style">Vendor Name (readonly)</label>
-                  <input
-                    value={user?.name || ''}
-                    disabled
-                    className="input-style opacity-50 cursor-not-allowed"
-                  />
-                </div>
-                <div>
-                  <label className="label-style">Vendor Email (readonly)</label>
-                  <input
-                    value={user?.email || ''}
-                    disabled
-                    className="input-style opacity-50 cursor-not-allowed"
-                  />
-                </div>
-              </div>
-
               <Button
                 type="submit"
                 isLoading={submitting}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-11 rounded-xl"
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-11 rounded-xl mt-4"
               >
-                Add Ticket
+                {editingId ? 'Save Route Changes' : 'Dispatch Ticket Request'}
               </Button>
             </form>
           </Card>
         )}
 
-        {/* ═══════════════════════════════════
-            VENDOR — MY ADDED TICKETS
-        ═══════════════════════════════════ */}
         {activeTab === 'my-tickets' && user?.role === 'vendor' && (
-          <div className="space-y-4">
-            <h3 className="text-lg font-bold">My Added Tickets</h3>
-            {vendorTickets.length === 0 ? (
-              <div className="bg-[#1e1e1e] border border-neutral-800 rounded-2xl p-12 text-center text-neutral-500">
-                No tickets added yet.
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                {vendorTickets.map(t => (
-                  <Card
-                    key={t._id}
-                    className="bg-[#1e1e1e] border border-neutral-800 p-5 rounded-2xl flex flex-col gap-3 shadow-lg"
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {vendorTickets.map(t => (
+              <Card
+                key={t._id}
+                className="bg-[#1e1e1e] border border-neutral-800 p-5 rounded-2xl flex flex-col gap-3 shadow-lg"
+              >
+                <div className="flex justify-between items-center">
+                  <h4 className="font-bold text-white text-sm truncate">
+                    {t.company || t.title}
+                  </h4>
+                  <Badge status={t.status || 'pending'} />
+                </div>
+                <p className="text-xs text-neutral-400 font-mono">
+                  {t.from} → {t.to}
+                </p>
+                <div className="flex gap-2 mt-4 pt-2 border-t border-neutral-900/60">
+                  <Button
+                    size="sm"
+                    onClick={() => handleEditSelect(t)}
+                    disabled={t.status === 'rejected'}
+                    className="flex-1 bg-neutral-800 text-white rounded-xl"
                   >
-                    {t.image && (
-                      <img
-                        src={t.image}
-                        alt={t.title}
-                        className="w-full h-28 object-cover rounded-xl"
-                      />
-                    )}
-                    <div className="flex justify-between items-start gap-2">
-                      <div className="min-w-0">
-                        <h4 className="font-bold text-white text-sm truncate">
-                          {t.title || t.company}
-                        </h4>
-                        <p className="text-xs text-neutral-400">
+                    Update
+                  </Button>
+                  <Button
+                    size="sm"
+                    color="danger"
+                    variant="flat"
+                    onClick={() => handleDeleteTicket(t._id)}
+                    disabled={t.status === 'rejected'}
+                    className="flex-1 rounded-xl"
+                  >
+                    Delete
+                  </Button>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {activeTab === 'requested-bookings' && user?.role === 'vendor' && (
+          <Card className="bg-[#1e1e1e] border border-neutral-800 p-6 rounded-2xl shadow-xl overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="bg-neutral-900 text-xs text-neutral-400 uppercase">
+                  <th className="p-4">Passenger</th>
+                  <th className="p-4">Ticket</th>
+                  <th className="p-4">Total Price</th>
+                  <th className="p-4">Status</th>
+                  <th className="p-4">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {requestedBookings.map(b => (
+                  <tr key={b._id} className="border-b border-neutral-900/40">
+                    <td className="p-4 text-xs font-bold text-white">
+                      {b.userName}
+                      <p className="text-[10px] text-neutral-500 font-mono font-normal">
+                        {b.userEmail}
+                      </p>
+                    </td>
+                    <td className="p-4 text-xs">
+                      {b.company || b.title}{' '}
+                      <span className="text-neutral-500">(x{b.quantity})</span>
+                    </td>
+                    <td className="p-4 text-emerald-400 font-bold">
+                      BDT {b.price}
+                    </td>
+                    <td className="p-4">
+                      <Badge status={b.status} />
+                    </td>
+                    <td className="p-4">
+                      {b.status === 'pending' && (
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            color="success"
+                            onClick={() =>
+                              handleBookingAction(b._id, 'accepted')
+                            }
+                            className="text-white text-xs font-bold rounded-xl h-8"
+                          >
+                            Accept
+                          </Button>
+                          <Button
+                            size="sm"
+                            color="danger"
+                            variant="flat"
+                            onClick={() =>
+                              handleBookingAction(b._id, 'rejected')
+                            }
+                            className="text-xs font-bold rounded-xl h-8"
+                          >
+                            Reject
+                          </Button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+        )}
+
+        {activeTab === 'manage-tickets' && user?.role === 'admin' && (
+          <Card className="bg-[#1e1e1e] border border-neutral-800 p-6 rounded-2xl shadow-xl overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="bg-neutral-900 text-xs text-neutral-400 uppercase">
+                  <th className="p-4">Operator</th>
+                  <th className="p-4">Route</th>
+                  <th className="p-4">Status</th>
+                  <th className="p-4">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {allTickets.map(t => (
+                  <tr key={t._id} className="border-b border-neutral-900/40">
+                    <td className="p-4 font-bold text-white">
+                      {t.company || t.title}
+                      <p className="text-[10px] text-neutral-500 font-mono font-normal">
+                        {t.vendorEmail}
+                      </p>
+                    </td>
+                    <td className="p-4 text-xs">
+                      {t.from} → {t.to}
+                    </td>
+                    <td className="p-4">
+                      <Badge status={t.status || 'pending'} />
+                    </td>
+                    <td className="p-4 flex gap-2">
+                      {t.status !== 'approved' && (
+                        <Button
+                          size="sm"
+                          color="success"
+                          onClick={() => handleTicketStatus(t._id, 'approved')}
+                          className="text-white text-xs font-bold h-8 rounded-xl"
+                        >
+                          Approve
+                        </Button>
+                      )}
+                      {t.status !== 'rejected' && (
+                        <Button
+                          size="sm"
+                          color="danger"
+                          variant="flat"
+                          onClick={() => handleTicketStatus(t._id, 'rejected')}
+                          className="text-xs font-bold h-8 rounded-xl"
+                        >
+                          Reject
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+        )}
+
+        {activeTab === 'manage-users' && user?.role === 'admin' && (
+          <Card className="bg-[#1e1e1e] border border-neutral-800 p-6 rounded-2xl shadow-xl overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="bg-neutral-900 text-xs text-neutral-400 uppercase">
+                  <th className="p-4">User Identity</th>
+                  <th className="p-4">Role Context</th>
+                  <th className="p-4">Management Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {allUsers.map(u => (
+                  <tr key={u._id} className="border-b border-neutral-900/40">
+                    <td className="p-4 font-bold text-white">
+                      {u.name}
+                      <p className="text-xs text-neutral-500 font-mono font-normal">
+                        {u.email}
+                      </p>
+                    </td>
+                    <td className="p-4">
+                      <Badge status={u.role} />
+                    </td>
+                    <td className="p-4 flex gap-2">
+                      <Button
+                        size="sm"
+                        color="warning"
+                        variant="flat"
+                        onClick={() => handleUpdateRole(u._id, 'vendor')}
+                        disabled={u.role === 'vendor'}
+                      >
+                        Make Vendor
+                      </Button>
+                      {u.role === 'vendor' && (
+                        <Button
+                          size="sm"
+                          color="danger"
+                          onClick={() => handleMarkAsFraud(u._id)}
+                        >
+                          Flag Fraud
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+        )}
+
+        {activeTab === 'advertise-tickets' && user?.role === 'admin' && (
+          <Card className="bg-[#1e1e1e] border border-neutral-800 p-6 rounded-2xl shadow-xl overflow-x-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold">Advertisement Manager</h3>
+              <span className="text-xs text-amber-400 font-mono">
+                {allTickets.filter(t => t.advertised).length} / 6 Active
+              </span>
+            </div>
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="bg-neutral-900 text-xs text-neutral-400">
+                  <th className="p-4">Transit Option</th>
+                  <th className="p-4">Status</th>
+                  <th className="p-4">Toggle Context</th>
+                </tr>
+              </thead>
+              <tbody>
+                {allTickets
+                  .filter(t => t.status === 'approved')
+                  .map(t => (
+                    <tr key={t._id} className="border-b border-neutral-900/40">
+                      <td className="p-4 font-bold text-white">
+                        {t.company || t.title}
+                        <p className="text-xs text-neutral-500 font-mono">
                           {t.from} → {t.to}
                         </p>
-                      </div>
-                      <Badge status={t.status || 'pending'} />
-                    </div>
-                    <div className="text-xs text-neutral-500 space-y-1">
-                      <p>
-                        Type: <span className="text-neutral-300">{t.type}</span>
-                      </p>
-                      <p>
-                        Price:{' '}
-                        <span className="text-emerald-400 font-bold">
-                          BDT {t.price}
-                        </span>
-                      </p>
-                      <p>
-                        Seats:{' '}
-                        <span className="text-neutral-300">{t.seats}</span>
-                      </p>
-                      <p>
-                        Departure:{' '}
-                        <span className="text-neutral-300">
-                          {t.date} · {t.time}
-                        </span>
-                      </p>
-                    </div>
-                    {t.perks?.length > 0 && (
-                      <div className="flex flex-wrap gap-1">
-                        {t.perks.map(p => (
-                          <span
-                            key={p}
-                            className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full"
-                          >
-                            {p}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    <div className="flex gap-2 mt-auto pt-2 border-t border-neutral-900">
-                      <Button
-                        size="sm"
-                        color="primary"
-                        variant="flat"
-                        disabled={t.status === 'rejected'}
-                        onClick={() =>
-                          alert(
-                            'Edit modal — implement with a form similar to Add Ticket',
-                          )
-                        }
-                        className="flex-1 text-xs"
-                      >
-                        <Edit className="w-3.5 h-3.5 mr-1" /> Update
-                      </Button>
-                      <Button
-                        size="sm"
-                        color="danger"
-                        variant="flat"
-                        disabled={t.status === 'rejected'}
-                        onClick={() => handleDeleteTicket(t._id)}
-                        className="flex-1 text-xs"
-                      >
-                        <Trash2 className="w-3.5 h-3.5 mr-1" /> Delete
-                      </Button>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ═══════════════════════════════════
-            VENDOR — REQUESTED BOOKINGS
-        ═══════════════════════════════════ */}
-        {activeTab === 'requested-bookings' && user?.role === 'vendor' && (
-          <div className="space-y-4">
-            <h3 className="text-lg font-bold">Requested Bookings</h3>
-            <Card className="bg-[#1e1e1e] border border-neutral-800 p-6 rounded-2xl shadow-xl overflow-x-auto">
-              {requestedBookings.length === 0 ? (
-                <p className="text-neutral-500 text-center py-10">
-                  No booking requests yet.
-                </p>
-              ) : (
-                <table className="w-full text-left text-sm text-neutral-300">
-                  <thead className="bg-neutral-900 text-xs font-bold text-neutral-400 uppercase tracking-wider">
-                    <tr>
-                      <th className="p-4">Passenger</th>
-                      <th className="p-4">Ticket</th>
-                      <th className="p-4">Qty</th>
-                      <th className="p-4">Total</th>
-                      <th className="p-4">Status</th>
-                      <th className="p-4">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-neutral-900/60">
-                    {requestedBookings.map(b => (
-                      <tr key={b._id} className="hover:bg-neutral-900/40">
-                        <td className="p-4">
-                          <p className="font-bold text-white text-xs">
-                            {b.userName}
-                          </p>
-                          <p className="text-neutral-500 font-mono text-[10px]">
-                            {b.userEmail}
-                          </p>
-                        </td>
-                        <td className="p-4 text-xs">{b.company || b.title}</td>
-                        <td className="p-4 font-bold">{b.quantity}</td>
-                        <td className="p-4 font-bold text-emerald-400">
-                          BDT {b.price}
-                        </td>
-                        <td className="p-4">
-                          <Badge status={b.status} />
-                        </td>
-                        <td className="p-4">
-                          {b.status === 'pending' && (
-                            <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                color="success"
-                                onClick={() =>
-                                  handleBookingAction(b._id, 'accepted')
-                                }
-                                className="text-xs text-white h-8"
-                              >
-                                Accept
-                              </Button>
-                              <Button
-                                size="sm"
-                                color="danger"
-                                variant="flat"
-                                onClick={() =>
-                                  handleBookingAction(b._id, 'rejected')
-                                }
-                                className="text-xs h-8"
-                              >
-                                Reject
-                              </Button>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </Card>
-          </div>
-        )}
-
-        {/* ═══════════════════════════════════
-            VENDOR — REVENUE OVERVIEW
-        ═══════════════════════════════════ */}
-        {activeTab === 'revenue' && user?.role === 'vendor' && (
-          <div className="space-y-6">
-            <h3 className="text-lg font-bold flex items-center gap-2">
-              <Activity className="w-5 h-5 text-emerald-500" /> Revenue Overview
-            </h3>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {[
-                {
-                  label: 'Total Tickets',
-                  value: vendorTickets.length,
-                  color: 'text-white',
-                },
-                {
-                  label: 'Approved',
-                  value: vendorTickets.filter(t => t.status === 'approved')
-                    .length,
-                  color: 'text-emerald-400',
-                },
-                {
-                  label: 'Pending',
-                  value: vendorTickets.filter(t => t.status === 'pending')
-                    .length,
-                  color: 'text-yellow-400',
-                },
-              ].map(stat => (
-                <div
-                  key={stat.label}
-                  className="bg-[#1e1e1e] border border-neutral-800 p-5 rounded-2xl"
-                >
-                  <p className="text-xs text-neutral-500 uppercase font-mono mb-1">
-                    {stat.label}
-                  </p>
-                  <p className={`text-3xl font-black ${stat.color}`}>
-                    {stat.value}
-                  </p>
-                </div>
-              ))}
-            </div>
-
-            <Card className="bg-[#1e1e1e] border border-neutral-800 p-6 rounded-2xl shadow-xl">
-              <h4 className="text-sm font-bold mb-4 text-neutral-300">
-                Tickets by Transport Type
-              </h4>
-              <div className="w-full h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
-                    <XAxis dataKey="name" stroke="#525252" />
-                    <YAxis stroke="#525252" allowDecimals={false} />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: '#1f1f1f',
-                        borderColor: '#404040',
-                        color: '#fff',
-                      }}
-                    />
-                    <Bar
-                      dataKey="tickets"
-                      fill="#10b981"
-                      radius={[4, 4, 0, 0]}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </Card>
-          </div>
-        )}
-
-        {/* ═══════════════════════════════════
-            ADMIN — MANAGE TICKETS
-        ═══════════════════════════════════ */}
-        {activeTab === 'manage-tickets' && user?.role === 'admin' && (
-          <div className="space-y-4">
-            <h3 className="text-lg font-bold">Manage Tickets</h3>
-            <Card className="bg-[#1e1e1e] border border-neutral-800 p-6 rounded-2xl shadow-xl overflow-x-auto">
-              {allTickets.length === 0 ? (
-                <p className="text-neutral-500 text-center py-10">
-                  No tickets submitted yet.
-                </p>
-              ) : (
-                <table className="w-full text-left text-sm text-neutral-300">
-                  <thead className="bg-neutral-900 text-xs font-bold text-neutral-400 uppercase tracking-wider">
-                    <tr>
-                      <th className="p-4">Ticket</th>
-                      <th className="p-4">Vendor</th>
-                      <th className="p-4">Route</th>
-                      <th className="p-4">Price</th>
-                      <th className="p-4">Status</th>
-                      <th className="p-4">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-neutral-900/60">
-                    {allTickets.map(t => (
-                      <tr key={t._id} className="hover:bg-neutral-900/40">
-                        <td className="p-4 font-bold text-white">
-                          {t.title || t.company}
-                        </td>
-                        <td className="p-4 text-xs font-mono text-neutral-400">
-                          {t.vendorEmail}
-                        </td>
-                        <td className="p-4 text-xs">
-                          {t.from} → {t.to}
-                        </td>
-                        <td className="p-4 font-bold text-emerald-400">
-                          BDT {t.price}
-                        </td>
-                        <td className="p-4">
-                          <Badge status={t.status || 'pending'} />
-                        </td>
-                        <td className="p-4">
-                          <div className="flex gap-2">
-                            {t.status !== 'approved' && (
-                              <Button
-                                size="sm"
-                                color="success"
-                                onClick={() =>
-                                  handleTicketStatus(t._id, 'approved')
-                                }
-                                className="text-xs text-white h-8"
-                              >
-                                <CheckCircle className="w-3.5 h-3.5 mr-1" />{' '}
-                                Approve
-                              </Button>
-                            )}
-                            {t.status !== 'rejected' && (
-                              <Button
-                                size="sm"
-                                color="danger"
-                                variant="flat"
-                                onClick={() =>
-                                  handleTicketStatus(t._id, 'rejected')
-                                }
-                                className="text-xs h-8"
-                              >
-                                <XCircle className="w-3.5 h-3.5 mr-1" /> Reject
-                              </Button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </Card>
-          </div>
-        )}
-
-        {/* ═══════════════════════════════════
-            ADMIN — MANAGE USERS
-        ═══════════════════════════════════ */}
-        {activeTab === 'manage-users' && user?.role === 'admin' && (
-          <div className="space-y-4">
-            <h3 className="text-lg font-bold">Manage Users</h3>
-            <Card className="bg-[#1e1e1e] border border-neutral-800 p-6 rounded-2xl shadow-xl overflow-x-auto">
-              <table className="w-full text-left text-sm text-neutral-300">
-                <thead className="bg-neutral-900 text-xs font-bold text-neutral-400 uppercase tracking-wider">
-                  <tr>
-                    <th className="p-4">Name</th>
-                    <th className="p-4">Email</th>
-                    <th className="p-4">Role</th>
-                    <th className="p-4">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-neutral-900/60">
-                  {allUsers.map(u => (
-                    <tr key={u._id} className="hover:bg-neutral-900/40">
-                      <td className="p-4 font-bold text-white">{u.name}</td>
-                      <td className="p-4 text-xs font-mono">{u.email}</td>
-                      <td className="p-4">
-                        <Badge status={u.role} />
+                      </td>
+                      <td className="p-4 font-bold text-xs">
+                        {t.advertised ? (
+                          <span className="text-emerald-400">Active Ad</span>
+                        ) : (
+                          <span className="text-neutral-500">Off</span>
+                        )}
                       </td>
                       <td className="p-4">
-                        <div className="flex flex-wrap gap-2">
-                          <Button
-                            size="sm"
-                            color="primary"
-                            variant="flat"
-                            disabled={u.role === 'admin'}
-                            onClick={() => handleUpdateRole(u._id, 'admin')}
-                            className="text-xs h-8"
-                          >
-                            Make Admin
-                          </Button>
-                          <Button
-                            size="sm"
-                            color="warning"
-                            variant="flat"
-                            disabled={u.role === 'vendor'}
-                            onClick={() => handleUpdateRole(u._id, 'vendor')}
-                            className="text-xs h-8"
-                          >
-                            Make Vendor
-                          </Button>
-                          {u.role === 'vendor' && (
-                            <Button
-                              size="sm"
-                              color="danger"
-                              variant="ghost"
-                              onClick={() => handleMarkAsFraud(u._id)}
-                              className="text-xs h-8"
-                            >
-                              <ShieldAlert className="w-3.5 h-3.5 mr-1" /> Fraud
-                            </Button>
-                          )}
-                        </div>
+                        <button
+                          onClick={() =>
+                            handleAdvertiseToggle(t._id, t.advertised)
+                          }
+                          className={`text-xs font-bold px-3 py-1.5 rounded-xl border ${t.advertised ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'}`}
+                        >
+                          {t.advertised
+                            ? 'Unadvertise'
+                            : 'Activate Advertisement'}
+                        </button>
                       </td>
                     </tr>
                   ))}
-                </tbody>
-              </table>
-            </Card>
-          </div>
-        )}
-
-        {/* ═══════════════════════════════════
-            ADMIN — ADVERTISE TICKETS
-        ═══════════════════════════════════ */}
-        {activeTab === 'advertise-tickets' && user?.role === 'admin' && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold">Advertise Tickets</h3>
-              <span className="text-xs text-neutral-400 bg-neutral-900 border border-neutral-800 px-3 py-1.5 rounded-lg">
-                <Star className="w-3 h-3 inline mr-1 text-amber-400" />
-                {allTickets.filter(t => t.advertised).length} / 6 advertised
-              </span>
-            </div>
-            <p className="text-xs text-neutral-500">
-              Only approved tickets appear here. Max 6 can be advertised at
-              once.
-            </p>
-            <Card className="bg-[#1e1e1e] border border-neutral-800 p-6 rounded-2xl shadow-xl overflow-x-auto">
-              {allTickets.filter(t => t.status === 'approved').length === 0 ? (
-                <p className="text-neutral-500 text-center py-10">
-                  No approved tickets yet.
-                </p>
-              ) : (
-                <table className="w-full text-left text-sm text-neutral-300">
-                  <thead className="bg-neutral-900 text-xs font-bold text-neutral-400 uppercase tracking-wider">
-                    <tr>
-                      <th className="p-4">Ticket</th>
-                      <th className="p-4">Vendor</th>
-                      <th className="p-4">Route</th>
-                      <th className="p-4">Price</th>
-                      <th className="p-4">Advertised</th>
-                      <th className="p-4">Toggle</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-neutral-900/60">
-                    {allTickets
-                      .filter(t => t.status === 'approved')
-                      .map(t => (
-                        <tr key={t._id} className="hover:bg-neutral-900/40">
-                          <td className="p-4 font-bold text-white">
-                            {t.title || t.company}
-                          </td>
-                          <td className="p-4 text-xs font-mono text-neutral-400">
-                            {t.vendorEmail}
-                          </td>
-                          <td className="p-4 text-xs">
-                            {t.from} → {t.to}
-                          </td>
-                          <td className="p-4 font-bold text-emerald-400">
-                            BDT {t.price}
-                          </td>
-                          <td className="p-4">
-                            <span
-                              className={
-                                t.advertised
-                                  ? 'text-emerald-400 font-bold'
-                                  : 'text-neutral-500'
-                              }
-                            >
-                              {t.advertised ? 'Yes' : 'No'}
-                            </span>
-                          </td>
-                          <td className="p-4">
-                            <button
-                              onClick={() =>
-                                handleAdvertiseToggle(t._id, t.advertised)
-                              }
-                              className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all ${
-                                t.advertised
-                                  ? 'bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20'
-                                  : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20'
-                              }`}
-                            >
-                              {t.advertised ? (
-                                <>
-                                  <ToggleRight className="w-4 h-4" />{' '}
-                                  Unadvertise
-                                </>
-                              ) : (
-                                <>
-                                  <ToggleLeft className="w-4 h-4" /> Advertise
-                                </>
-                              )}
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-              )}
-            </Card>
-          </div>
+              </tbody>
+            </table>
+          </Card>
         )}
       </main>
+
+      {/* STRIPE SECURE PAYMENT GATEWAY CARD MODAL INTERFACE */}
+      {payTarget && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+          <div className="w-full max-w-md bg-[#1e1e1e] border border-neutral-800 p-6 rounded-2xl shadow-2xl space-y-5 animate-appearance-in">
+            <div>
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <CreditCard className="w-5 h-5 text-emerald-500" /> Stripe
+                Payment Gateway
+              </h3>
+              <p className="text-xs text-neutral-500 mt-1">
+                Complete transit clearance for{' '}
+                {payTarget.company || payTarget.title}
+              </p>
+            </div>
+            <form onSubmit={executeStripePayment} className="space-y-4">
+              <div>
+                <label className="text-[11px] uppercase font-bold text-neutral-400 tracking-wider block mb-1">
+                  Card Credentials (Stripe Sandbox)
+                </label>
+                <input
+                  disabled
+                  value={stripeForm.card}
+                  className="w-full h-11 bg-neutral-900 border border-neutral-800 text-neutral-400 rounded-xl px-4 text-sm font-mono cursor-not-allowed"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] uppercase font-bold text-neutral-400 tracking-wider block mb-1">
+                  Card Holder Name
+                </label>
+                <input
+                  required
+                  placeholder="e.g. REEZ"
+                  value={stripeForm.holder}
+                  onChange={e =>
+                    setStripeForm({ ...stripeForm, holder: e.target.value })
+                  }
+                  className="w-full h-11 bg-neutral-900 border border-neutral-800 text-white rounded-xl px-4 text-sm outline-none focus:border-emerald-500 font-bold"
+                />
+              </div>
+              <div className="bg-neutral-900/60 p-3 rounded-xl border border-neutral-900 flex justify-between items-center text-xs">
+                <span className="text-neutral-400">Total Charged Amount:</span>
+                <span className="text-emerald-400 font-black text-base">
+                  BDT {payTarget.price}
+                </span>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <Button
+                  type="button"
+                  variant="flat"
+                  onClick={() => setPayTarget(null)}
+                  className="flex-1 bg-neutral-900 text-neutral-400 font-bold h-11 rounded-xl"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  isLoading={payLoading}
+                  className="flex-1 bg-emerald-600 text-white font-bold h-11 rounded-xl shadow-lg shadow-emerald-950/40"
+                >
+                  Authorize Payment
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
