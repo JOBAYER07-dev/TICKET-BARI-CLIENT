@@ -1,5 +1,5 @@
 import { Suspense } from 'react';
-import AllTicketsContent from './AllTicketsContent.jsx';
+import AllTicketsContent from './AllTicketsContent';
 
 export default function AllTicketsPage() {
   return (
