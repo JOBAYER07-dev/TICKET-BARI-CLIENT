@@ -355,6 +355,7 @@ export default function DashboardPage() {
   };
 
   const handleAdvertiseToggle = async (id, current) => {
+    // ✅ Client-side 6/6 check
     const advertisedCount = allTickets.filter(t => t.advertised).length;
     if (!current && advertisedCount >= 6) {
       toast.error('Max 6 tickets can be advertised at a time!');
@@ -372,34 +373,17 @@ export default function DashboardPage() {
     }
   };
 
-  // ✅ FIXED: Role updates now synchronize local state instantly without breaks
+  // ✅ Make Admin + Make Vendor
   const handleUpdateRole = async (userId, role) => {
-    const toastId = toast.loading(`Upgrading target user to ${role}...`);
     try {
       await apiRequest(`/users/role/${userId}`, {
         method: 'PATCH',
         body: JSON.stringify({ role }),
       });
-
-      setAllUsers(prevUsers =>
-        prevUsers.map(u => (u._id === userId ? { ...u, role: role } : u)),
-      );
-
-      toast.update(toastId, {
-        render: `User promoted to ${role} successfully! 🎉`,
-        type: 'success',
-        isLoading: false,
-        autoClose: 3000,
-      });
-
+      toast.success(`User promoted to ${role}.`);
       fetchData(user);
     } catch (err) {
-      toast.update(toastId, {
-        render: err.message || 'Authorization patch failed.',
-        type: 'error',
-        isLoading: false,
-        autoClose: 3000,
-      });
+      toast.error(err.message);
     }
   };
 
@@ -573,6 +557,7 @@ export default function DashboardPage() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 {bookings.map(b => {
+                  // ✅ Check if departure has passed
                   const departed = isDeparturePassed(b.date, b.time);
                   return (
                     <Card
@@ -612,6 +597,7 @@ export default function DashboardPage() {
                         </p>
                       </div>
 
+                      {/* ✅ Countdown on every booking card */}
                       {b.status !== 'rejected' && (
                         <div className="flex items-center gap-1.5 bg-neutral-900 rounded-xl px-3 py-2 text-xs">
                           <span className="text-neutral-500">Departs in:</span>
@@ -619,6 +605,7 @@ export default function DashboardPage() {
                         </div>
                       )}
 
+                      {/* ✅ Pay Now — disabled if departure passed */}
                       {b.status === 'accepted' &&
                         (departed ? (
                           <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2 text-center">
@@ -693,6 +680,7 @@ export default function DashboardPage() {
               {editingId ? 'Edit Ticket' : 'Add New Ticket'}
             </h2>
             <form onSubmit={handleCreateOrUpdateTicket} className="space-y-4">
+              {/* Ticket Title */}
               <div>
                 <label className="text-xs font-semibold text-neutral-400 uppercase tracking-wider block mb-1.5">
                   Ticket Title
@@ -708,6 +696,7 @@ export default function DashboardPage() {
                 />
               </div>
 
+              {/* ✅ Transport Type */}
               <div>
                 <label className="text-xs font-semibold text-neutral-400 uppercase tracking-wider block mb-1.5">
                   Transport Type
@@ -728,6 +717,7 @@ export default function DashboardPage() {
                 </select>
               </div>
 
+              {/* From / To */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs font-semibold text-neutral-400 uppercase tracking-wider block mb-1.5">
@@ -759,6 +749,7 @@ export default function DashboardPage() {
                 </div>
               </div>
 
+              {/* Price / Seats / Date / Time */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs font-semibold text-neutral-400 uppercase tracking-wider block mb-1.5">
@@ -820,6 +811,7 @@ export default function DashboardPage() {
                 </div>
               </div>
 
+              {/* ✅ Perks Checkboxes */}
               <div>
                 <label className="text-xs font-semibold text-neutral-400 uppercase tracking-wider block mb-2">
                   Perks
@@ -842,6 +834,7 @@ export default function DashboardPage() {
                 </div>
               </div>
 
+              {/* ✅ imgbb Image Upload */}
               <div>
                 <label className="text-xs font-semibold text-neutral-400 uppercase tracking-wider block mb-1.5">
                   Ticket Image
@@ -895,6 +888,7 @@ export default function DashboardPage() {
                 )}
               </div>
 
+              {/* Vendor info (readonly) */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs font-semibold text-neutral-400 uppercase tracking-wider block mb-1.5">
@@ -1074,6 +1068,7 @@ export default function DashboardPage() {
           <div className="space-y-6">
             <h3 className="text-lg font-bold">Revenue Overview</h3>
 
+            {/* ✅ Stats Cards with real data */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-[#1e1e1e] border border-neutral-800 rounded-2xl p-5 flex items-center gap-4">
                 <div className="p-3 bg-emerald-500/10 rounded-xl">
@@ -1116,6 +1111,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
+            {/* ✅ Chart with real data */}
             <Card className="bg-[#1e1e1e] border border-neutral-800 p-6 rounded-2xl shadow-xl">
               <h4 className="text-sm font-bold mb-4 text-neutral-300">
                 Revenue by Transport Type
@@ -1236,6 +1232,7 @@ export default function DashboardPage() {
                     </td>
                     <td className="p-4">
                       <div className="flex flex-wrap gap-2">
+                        {/* ✅ Make Admin button */}
                         <Button
                           size="sm"
                           color="secondary"
@@ -1246,6 +1243,7 @@ export default function DashboardPage() {
                         >
                           Make Admin
                         </Button>
+                        {/* Make Vendor button */}
                         <Button
                           size="sm"
                           color="warning"
@@ -1256,6 +1254,7 @@ export default function DashboardPage() {
                         >
                           Make Vendor
                         </Button>
+                        {/* Flag Fraud — only for vendors */}
                         {u.role === 'vendor' && (
                           <Button
                             size="sm"
@@ -1299,6 +1298,7 @@ export default function DashboardPage() {
                 {allTickets
                   .filter(t => t.status === 'approved')
                   .map(t => {
+                    // ✅ Disable Activate if already 6 are active
                     const cantActivate = !t.advertised && advertisedCount >= 6;
                     return (
                       <tr
