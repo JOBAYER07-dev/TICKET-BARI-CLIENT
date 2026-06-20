@@ -2,12 +2,10 @@
 
 import { useEffect } from 'react';
 
-// This page receives the Google OAuth redirect with access_token in the URL hash.
-// It sends the token back to the parent (login) window via postMessage, then closes.
 export default function AuthCallbackPage() {
   useEffect(() => {
     try {
-      const hash = window.location.hash; // e.g. #access_token=xxx&token_type=Bearer...
+      const hash = window.location.hash;
 
       if (hash && hash.includes('access_token=') && window.opener) {
         // Send token to parent login window
