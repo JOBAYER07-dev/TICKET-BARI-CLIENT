@@ -11,15 +11,154 @@
     scroll-behavior: smooth;
   }
 
-  html.dark body {
+  /* ── Default (Dark Mode) ── */
+  body {
     background-color: #121212;
     color: #ffffff;
   }
 
+  /* ── Light Mode ── */
   html.light body {
-    background-color: #f9fafb;
+    background-color: #f1f5f9;
     color: #111827;
   }
+}
+
+/* ════════════════════════════════════════
+   LIGHT MODE — Override hardcoded dark colors
+════════════════════════════════════════ */
+
+/* Main backgrounds */
+html.light .bg-\[\#121212\] {
+  background-color: #f1f5f9 !important;
+}
+
+html.light .bg-\[\#1e1e1e\] {
+  background-color: #ffffff !important;
+}
+
+html.light .bg-\[\#1a1a1a\] {
+  background-color: #e2e8f0 !important;
+}
+
+html.light .bg-\[\#1e1e1e\]\/90 {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+}
+
+html.light .bg-\[\#1a1a1a\]\/90 {
+  background-color: rgba(226, 232, 240, 0.95) !important;
+}
+
+/* Neutral backgrounds */
+html.light .bg-neutral-900 {
+  background-color: #e2e8f0 !important;
+}
+
+html.light .bg-neutral-800 {
+  background-color: #cbd5e1 !important;
+}
+
+html.light .bg-neutral-950 {
+  background-color: #f8fafc !important;
+}
+
+html.light .bg-neutral-900\/40 {
+  background-color: rgba(226, 232, 240, 0.4) !important;
+}
+
+html.light .bg-neutral-900\/50 {
+  background-color: rgba(226, 232, 240, 0.5) !important;
+}
+
+html.light .bg-neutral-900\/60 {
+  background-color: rgba(226, 232, 240, 0.6) !important;
+}
+
+/* Borders */
+html.light .border-neutral-800 {
+  border-color: #cbd5e1 !important;
+}
+
+html.light .border-neutral-900 {
+  border-color: #e2e8f0 !important;
+}
+
+html.light .border-neutral-700 {
+  border-color: #94a3b8 !important;
+}
+
+html.light .border-neutral-900\/40 {
+  border-color: rgba(203, 213, 225, 0.4) !important;
+}
+
+/* Text colors */
+html.light .text-white {
+  color: #111827 !important;
+}
+
+html.light .text-neutral-200 {
+  color: #1f2937 !important;
+}
+
+html.light .text-neutral-300 {
+  color: #374151 !important;
+}
+
+html.light .text-neutral-400 {
+  color: #4b5563 !important;
+}
+
+html.light .text-neutral-500 {
+  color: #6b7280 !important;
+}
+
+html.light .text-neutral-600 {
+  color: #9ca3af !important;
+}
+
+/* Hover states */
+html.light .hover\:bg-neutral-800:hover {
+  background-color: #cbd5e1 !important;
+}
+
+html.light .hover\:bg-neutral-700:hover {
+  background-color: #94a3b8 !important;
+}
+
+html.light .hover\:bg-neutral-900:hover {
+  background-color: #e2e8f0 !important;
+}
+
+html.light .hover\:text-white:hover {
+  color: #111827 !important;
+}
+
+/* Input fields */
+html.light input,
+html.light select,
+html.light textarea {
+  background-color: #f8fafc !important;
+  color: #111827 !important;
+  border-color: #cbd5e1 !important;
+}
+
+html.light input::placeholder {
+  color: #9ca3af !important;
+}
+
+/* Navbar fix */
+html.light nav {
+  background-color: rgba(241, 245, 249, 0.95) !important;
+  border-color: #cbd5e1 !important;
+}
+
+/* Table rows */
+html.light thead tr {
+  background-color: #e2e8f0 !important;
+}
+
+html.light tbody tr {
+  border-color: #e2e8f0 !important;
 }
 
 /* Scrollbar */
@@ -40,7 +179,19 @@
   background: #10b981;
 }
 
-/* Dashboard form utilities */
+html.light ::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+html.light ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+
+html.light ::-webkit-scrollbar-thumb:hover {
+  background: #10b981;
+}
+
+/* Dashboard utilities */
 @layer components {
   .input-style {
     @apply w-full h-11 bg-neutral-900 border border-neutral-800 rounded-xl px-4 text-sm text-white focus:outline-none focus:border-emerald-500 transition-colors;

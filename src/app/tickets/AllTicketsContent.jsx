@@ -235,8 +235,17 @@ export default function AllTicketsContent() {
             tickets.map(ticket => (
               <div
                 key={ticket._id || ticket.id}
-                className="bg-[#1e1e1e] border border-neutral-800 rounded-2xl shadow-lg hover:border-neutral-700 hover:shadow-xl transition-all group"
+                className="bg-[#1e1e1e] border border-neutral-800 rounded-2xl shadow-lg hover:border-neutral-700 hover:shadow-xl transition-all group overflow-hidden"
               >
+                {/* ✅ Ticket Image */}
+                {ticket.image && (
+                  <img
+                    src={ticket.image}
+                    alt={ticket.title || ticket.company}
+                    className="w-full h-40 object-cover"
+                  />
+                )}
+
                 <div className="p-5 flex flex-col gap-4">
                   {/* ── Top Row: Icon + Info + Price + Button ── */}
                   <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-4">

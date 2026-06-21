@@ -34,7 +34,9 @@ export default function RegisterPage() {
           isLoading: false,
           autoClose: 3000,
         });
-        router.push('/login');
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        router.push('/');
       }
     } catch (err) {
       toast.update(toastId, {

@@ -116,6 +116,20 @@ function TicketGrid({ title, subtitle, data, typeLabel }) {
                         <span>{ticket.seats ?? 0} seats left</span>
                       </div>
                     </div>
+
+                    {/* ✅ Perks */}
+                    {ticket.perks?.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {ticket.perks.slice(0, 3).map(p => (
+                          <span
+                            key={p}
+                            className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full"
+                          >
+                            ✓ {p}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   <Link

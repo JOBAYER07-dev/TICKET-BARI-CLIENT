@@ -564,6 +564,15 @@ export default function DashboardPage() {
                       key={b._id}
                       className="bg-[#1e1e1e] border border-neutral-800 p-5 rounded-2xl flex flex-col gap-3 shadow-lg"
                     >
+                      {/* ✅ Booking image */}
+                      {b.image && (
+                        <img
+                          src={b.image}
+                          alt={b.company || b.title}
+                          className="w-full h-24 object-cover rounded-xl border border-neutral-800"
+                        />
+                      )}
+
                       <div className="flex justify-between items-start">
                         <div>
                           <h4 className="font-bold text-white text-sm">
