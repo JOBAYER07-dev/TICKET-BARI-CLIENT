@@ -21,22 +21,35 @@ export default function RegisterPage() {
   const handleSubmit = async e => {
     e.preventDefault();
     setLoading(true);
-    const toastId = toast.loading('Creating secure passenger profile...');
+    const toastId = toast.loading('Creating your account...');
     try {
+      // Step 1: Register
       const data = await apiRequest('/register', {
         method: 'POST',
         body: JSON.stringify(formData),
       });
+
       if (data.success) {
-        toast.update(toastId, {
-          render: 'Registration successful! Redirecting to login... 🎉',
-          type: 'success',
-          isLoading: false,
-          autoClose: 3000,
+        // ✅ Step 2: Auto login
+        const loginData = await apiRequest('/login', {
+          method: 'POST',
+          body: JSON.stringify({
+            email: formData.email,
+            password: formData.password,
+          }),
         });
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        router.push('/');
+
+        if (loginData.success && loginData.token) {
+          localStorage.setItem('token', loginData.token);
+          localStorage.setItem('user', JSON.stringify(loginData.user));
+          toast.update(toastId, {
+            render: `Welcome to TicketBari, ${loginData.user.name}! 🎉`,
+            type: 'success',
+            isLoading: false,
+            autoClose: 2000,
+          });
+          router.push('/'); // ✅ Home-এ redirect
+        }
       }
     } catch (err) {
       toast.update(toastId, {

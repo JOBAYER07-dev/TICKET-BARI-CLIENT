@@ -142,6 +142,7 @@ export default function TicketDetailsPage({ params }) {
         price: Number(ticket.price) * Number(bookingQuantity),
         date: ticket.date,
         time: ticket.time,
+        image: ticket.image || '',
         userName: user.name,
         userEmail: user.email,
         status: 'pending',

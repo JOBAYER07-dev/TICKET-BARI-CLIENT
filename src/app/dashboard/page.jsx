@@ -413,7 +413,10 @@ export default function DashboardPage() {
     try {
       const intent = await apiRequest('/create-payment-intent', {
         method: 'POST',
-        body: JSON.stringify({ price: payTarget.price }),
+        body: JSON.stringify({
+          price: payTarget.price,
+          ticketId: payTarget.ticketId,
+        }),
       });
 
       if (intent.clientSecret) {
