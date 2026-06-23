@@ -7,7 +7,6 @@ import {
   LayoutDashboard,
   LogOut,
   PlusCircle,
-  User,
   TrendingUp,
   Ticket,
   DollarSign,
@@ -126,8 +125,7 @@ async function uploadToImgbb(file, setImageUploading) {
 // ── isDeparturePassed helper ──────────────────────────────────────
 function isDeparturePassed(date, time) {
   if (!date) return false;
-  const target = new Date(`${date}T${time || '00:00'}`).getTime();
-  return Date.now() > target;
+  return Date.now() > new Date(`${date}T${time || '00:00'}`).getTime();
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -146,16 +144,6 @@ export default function DashboardPage() {
   const [allUsers, setAllUsers] = useState([]);
   const [allTickets, setAllTickets] = useState([]);
   const [revenueStats, setRevenueStats] = useState(null);
-
-  // Payment modal
-  const [payTarget, setPayTarget] = useState(null);
-  const [cardDetails, setCardDetails] = useState({
-    number: '',
-    expiry: '',
-    cvc: '',
-    name: '',
-  });
-  const [payLoading, setPayLoading] = useState(false);
 
   // Ticket form
   const [newTicket, setNewTicket] = useState(EMPTY_TICKET);
@@ -233,7 +221,7 @@ export default function DashboardPage() {
     fetchData(parsed);
   }, []);
 
-  // ✅ Revenue stats — fetch when tab opens
+  // Revenue stats fetch
   useEffect(() => {
     if (activeTab === 'revenue' && user?.role === 'vendor') {
       apiRequest('/revenue/stats')
@@ -242,7 +230,7 @@ export default function DashboardPage() {
     }
   }, [activeTab, user]);
 
-  // ── Add / Update Ticket ────────────────────────────────────────
+  // ── Ticket CRUD ────────────────────────────────────────────────
   const handleCreateOrUpdateTicket = async e => {
     e.preventDefault();
     setSubmitting(true);
@@ -258,7 +246,6 @@ export default function DashboardPage() {
         vendorName: user.name,
         vendorEmail: user.email,
       };
-
       if (editingId) {
         await apiRequest(`/tickets/${editingId}`, {
           method: 'PATCH',
@@ -282,7 +269,6 @@ export default function DashboardPage() {
           autoClose: 3000,
         });
       }
-
       setNewTicket(EMPTY_TICKET);
       setEditingId(null);
       fetchData(user);
@@ -355,7 +341,6 @@ export default function DashboardPage() {
   };
 
   const handleAdvertiseToggle = async (id, current) => {
-    // ✅ Client-side 6/6 check
     const advertisedCount = allTickets.filter(t => t.advertised).length;
     if (!current && advertisedCount >= 6) {
       toast.error('Max 6 tickets can be advertised at a time!');
@@ -373,7 +358,6 @@ export default function DashboardPage() {
     }
   };
 
-  // ✅ Make Admin + Make Vendor
   const handleUpdateRole = async (userId, role) => {
     try {
       await apiRequest(`/users/role/${userId}`, {
@@ -401,61 +385,37 @@ export default function DashboardPage() {
     }
   };
 
-  // ── Stripe Payment ─────────────────────────────────────────────
-  const executePayment = async e => {
-    e.preventDefault();
-    if (cardDetails.number.replace(/\s/g, '') !== '4242424242424242') {
-      toast.error('Use Stripe test card: 4242 4242 4242 4242');
-      return;
-    }
-    setPayLoading(true);
-    const toastId = toast.loading('Processing payment...');
+  // ✅ Stripe Checkout — Hosted Payment Page
+  const executeCheckout = async booking => {
+    const toastId = toast.loading('Redirecting to Stripe...');
     try {
-      const intent = await apiRequest('/create-payment-intent', {
+      const data = await apiRequest('/create-checkout-session', {
         method: 'POST',
         body: JSON.stringify({
-          price: payTarget.price,
-          ticketId: payTarget.ticketId,
+          price: booking.price,
+          ticketTitle: booking.company || booking.title,
+          quantity: booking.quantity,
+          bookingId: booking._id,
+          ticketId: booking.ticketId,
         }),
       });
-
-      if (intent.clientSecret) {
-        await apiRequest('/payments/confirm', {
-          method: 'POST',
-          body: JSON.stringify({
-            bookingId: payTarget._id,
-            transactionId:
-              'ch_' + Math.random().toString(36).substr(2, 9).toUpperCase(),
-            ticketId: payTarget.ticketId,
-            finalPrice: payTarget.price,
-            ticketTitle: payTarget.company || payTarget.title,
-            userEmail: user.email,
-            quantity: payTarget.quantity,
-          }),
-        });
-        toast.update(toastId, {
-          render: 'Payment Successful! 🎉',
-          type: 'success',
-          isLoading: false,
-          autoClose: 3000,
-        });
-        setPayTarget(null);
-        setCardDetails({ number: '', expiry: '', cvc: '', name: '' });
-        fetchData(user);
-      }
-    } catch {
       toast.update(toastId, {
-        render: 'Payment failed.',
+        render: 'Redirecting to payment... 🔄',
+        type: 'success',
+        isLoading: false,
+        autoClose: 1000,
+      });
+      window.location.href = data.url;
+    } catch (err) {
+      toast.update(toastId, {
+        render: err.message || 'Payment failed.',
         type: 'error',
         isLoading: false,
         autoClose: 3000,
       });
-    } finally {
-      setPayLoading(false);
     }
   };
 
-  // ── Toggle Perks ───────────────────────────────────────────────
   const togglePerk = perk => {
     setNewTicket(prev => ({
       ...prev,
@@ -472,12 +432,11 @@ export default function DashboardPage() {
       </div>
     );
 
-  // ── Advertise count for UI ─────────────────────────────────────
   const advertisedCount = allTickets.filter(t => t.advertised).length;
 
   return (
     <div className="min-h-screen bg-[#121212] text-white flex flex-col md:flex-row">
-      {/* SIDEBAR */}
+      {/* ── SIDEBAR ─────────────────────────────────── */}
       <aside className="w-full md:w-64 bg-[#1a1a1a] border-r border-neutral-800 p-6 flex flex-col justify-between md:min-h-screen shrink-0">
         <div className="space-y-6">
           <div className="flex items-center gap-2 pb-4 border-b border-neutral-800">
@@ -489,7 +448,11 @@ export default function DashboardPage() {
               <button
                 key={item.key}
                 onClick={() => setActiveTab(item.key)}
-                className={`w-full text-left px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${activeTab === item.key ? 'bg-emerald-600 text-white shadow-lg' : 'text-neutral-400 hover:bg-neutral-900 hover:text-white'}`}
+                className={`w-full text-left px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                  activeTab === item.key
+                    ? 'bg-emerald-600 text-white shadow-lg'
+                    : 'text-neutral-400 hover:bg-neutral-900 hover:text-white'
+                }`}
               >
                 {item.label}
               </button>
@@ -507,7 +470,7 @@ export default function DashboardPage() {
         </button>
       </aside>
 
-      {/* MAIN */}
+      {/* ── MAIN CONTENT ────────────────────────────── */}
       <main className="flex-1 p-6 md:p-10 space-y-8 overflow-y-auto">
         {/* Welcome Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[#1e1e1e] p-6 rounded-2xl border border-neutral-800 shadow-xl">
@@ -520,7 +483,7 @@ export default function DashboardPage() {
           <Badge status={user?.role} />
         </div>
 
-        {/* ── PROFILE ─────────────────────────────── */}
+        {/* ── PROFILE ─────────────────────────────────── */}
         {activeTab === 'profile' && (
           <Card className="bg-[#1e1e1e] border border-neutral-800 p-6 rounded-2xl shadow-xl">
             <h3 className="text-lg font-bold mb-6">Account Overview</h3>
@@ -549,7 +512,7 @@ export default function DashboardPage() {
           </Card>
         )}
 
-        {/* ── MY BOOKED TICKETS ────────────────────── */}
+        {/* ── MY BOOKED TICKETS (USER) ─────────────────── */}
         {activeTab === 'booked' && user?.role === 'user' && (
           <div className="space-y-4">
             <h3 className="text-lg font-bold">My Booked Tickets</h3>
@@ -560,78 +523,82 @@ export default function DashboardPage() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 {bookings.map(b => {
-                  // ✅ Check if departure has passed
                   const departed = isDeparturePassed(b.date, b.time);
                   return (
                     <Card
                       key={b._id}
-                      className="bg-[#1e1e1e] border border-neutral-800 p-5 rounded-2xl flex flex-col gap-3 shadow-lg"
+                      className="bg-[#1e1e1e] border border-neutral-800 rounded-2xl overflow-hidden flex flex-col shadow-lg"
                     >
-                      {/* ✅ Booking image */}
+                      {/* Image */}
                       {b.image && (
                         <img
                           src={b.image}
                           alt={b.company || b.title}
-                          className="w-full h-24 object-cover rounded-xl border border-neutral-800"
+                          className="w-full h-32 object-cover"
                         />
                       )}
 
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h4 className="font-bold text-white text-sm">
-                            {b.company || b.title}
-                          </h4>
-                          <p className="text-xs text-neutral-400 mt-0.5">
-                            {b.route}
+                      <div className="p-5 flex flex-col gap-3 flex-1">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h4 className="font-bold text-white text-sm">
+                              {b.company || b.title}
+                            </h4>
+                            <p className="text-xs text-neutral-400 mt-0.5">
+                              {b.route}
+                            </p>
+                          </div>
+                          <Badge status={b.status} />
+                        </div>
+
+                        <div className="text-xs text-neutral-500 border-t border-neutral-900/40 pt-3 space-y-1">
+                          <p>
+                            Quantity:{' '}
+                            <span className="text-white font-bold">
+                              {b.quantity}
+                            </span>
+                          </p>
+                          <p>
+                            Total:{' '}
+                            <span className="text-emerald-400 font-bold">
+                              BDT {b.price}
+                            </span>
+                          </p>
+                          <p>
+                            Departure:{' '}
+                            <span className="text-neutral-300">
+                              {b.date} {b.time}
+                            </span>
                           </p>
                         </div>
-                        <Badge status={b.status} />
-                      </div>
 
-                      <div className="text-xs text-neutral-500 border-t border-neutral-900/40 pt-3 space-y-1">
-                        <p>
-                          Quantity:{' '}
-                          <span className="text-white font-bold">
-                            {b.quantity}
-                          </span>
-                        </p>
-                        <p>
-                          Total:{' '}
-                          <span className="text-emerald-400 font-bold">
-                            BDT {b.price}
-                          </span>
-                        </p>
-                        <p>
-                          Departure:{' '}
-                          <span className="text-neutral-300">
-                            {b.date} {b.time}
-                          </span>
-                        </p>
-                      </div>
-
-                      {/* ✅ Countdown on every booking card */}
-                      {b.status !== 'rejected' && (
-                        <div className="flex items-center gap-1.5 bg-neutral-900 rounded-xl px-3 py-2 text-xs">
-                          <span className="text-neutral-500">Departs in:</span>
-                          <CountdownTimer date={b.date} time={b.time} />
-                        </div>
-                      )}
-
-                      {/* ✅ Pay Now — disabled if departure passed */}
-                      {b.status === 'accepted' &&
-                        (departed ? (
-                          <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2 text-center">
-                            Payment closed — departure time passed
+                        {/* Countdown */}
+                        {b.status !== 'rejected' && (
+                          <div className="flex items-center gap-1.5 bg-neutral-900 rounded-xl px-3 py-2 text-xs">
+                            <span className="text-neutral-500">
+                              Departs in:
+                            </span>
+                            <CountdownTimer date={b.date} time={b.time} />
                           </div>
-                        ) : (
-                          <Button
-                            size="sm"
-                            onClick={() => setPayTarget(b)}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs w-full mt-2"
-                          >
-                            <CreditCard className="w-3.5 h-3.5 mr-1" /> Pay Now
-                          </Button>
-                        ))}
+                        )}
+
+                        {/* ✅ Pay Now → Stripe Checkout */}
+                        {b.status === 'accepted' &&
+                          (departed ? (
+                            <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2 text-center">
+                              Payment closed — departure time passed
+                            </div>
+                          ) : (
+                            <Button
+                              size="sm"
+                              onClick={() => executeCheckout(b)}
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs w-full mt-auto"
+                            >
+                              <CreditCard className="w-3.5 h-3.5 mr-1" /> Pay
+                              Now
+                            </Button>
+                          ))}
+                      </div>
                     </Card>
                   );
                 })}
@@ -640,7 +607,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* ── TRANSACTIONS ──────────────────────────── */}
+        {/* ── TRANSACTIONS (USER) ──────────────────────── */}
         {activeTab === 'transactions' && user?.role === 'user' && (
           <div className="space-y-4">
             <h3 className="text-lg font-bold">Transaction History</h3>
@@ -684,7 +651,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* ── ADD TICKET (VENDOR) ───────────────────── */}
+        {/* ── ADD TICKET (VENDOR) ──────────────────────── */}
         {activeTab === 'add-ticket' && user?.role === 'vendor' && (
           <Card className="bg-[#1e1e1e] border border-neutral-800 p-6 rounded-2xl shadow-xl">
             <h2 className="text-lg font-bold flex items-center gap-2 mb-6">
@@ -692,7 +659,6 @@ export default function DashboardPage() {
               {editingId ? 'Edit Ticket' : 'Add New Ticket'}
             </h2>
             <form onSubmit={handleCreateOrUpdateTicket} className="space-y-4">
-              {/* Ticket Title */}
               <div>
                 <label className="text-xs font-semibold text-neutral-400 uppercase tracking-wider block mb-1.5">
                   Ticket Title
@@ -708,7 +674,6 @@ export default function DashboardPage() {
                 />
               </div>
 
-              {/* ✅ Transport Type */}
               <div>
                 <label className="text-xs font-semibold text-neutral-400 uppercase tracking-wider block mb-1.5">
                   Transport Type
@@ -729,7 +694,6 @@ export default function DashboardPage() {
                 </select>
               </div>
 
-              {/* From / To */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs font-semibold text-neutral-400 uppercase tracking-wider block mb-1.5">
@@ -761,7 +725,6 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* Price / Seats / Date / Time */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs font-semibold text-neutral-400 uppercase tracking-wider block mb-1.5">
@@ -823,7 +786,6 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* ✅ Perks Checkboxes */}
               <div>
                 <label className="text-xs font-semibold text-neutral-400 uppercase tracking-wider block mb-2">
                   Perks
@@ -846,7 +808,6 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* ✅ imgbb Image Upload */}
               <div>
                 <label className="text-xs font-semibold text-neutral-400 uppercase tracking-wider block mb-1.5">
                   Ticket Image
@@ -900,7 +861,6 @@ export default function DashboardPage() {
                 )}
               </div>
 
-              {/* Vendor info (readonly) */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs font-semibold text-neutral-400 uppercase tracking-wider block mb-1.5">
@@ -948,7 +908,7 @@ export default function DashboardPage() {
           </Card>
         )}
 
-        {/* ── MY ADDED TICKETS (VENDOR) ─────────────── */}
+        {/* ── MY ADDED TICKETS (VENDOR) ────────────────── */}
         {activeTab === 'my-tickets' && user?.role === 'vendor' && (
           <div className="space-y-4">
             <h3 className="text-lg font-bold">My Added Tickets</h3>
@@ -961,46 +921,64 @@ export default function DashboardPage() {
                 {vendorTickets.map(t => (
                   <Card
                     key={t._id}
-                    className="bg-[#1e1e1e] border border-neutral-800 p-5 rounded-2xl flex flex-col gap-3 shadow-lg"
+                    className="bg-[#1e1e1e] border border-neutral-800 rounded-2xl overflow-hidden flex flex-col shadow-lg"
                   >
                     {t.image && (
                       <img
                         src={t.image}
                         alt={t.title}
-                        className="w-full h-28 object-cover rounded-xl border border-neutral-800"
+                        className="w-full h-28 object-cover"
                       />
                     )}
-                    <div className="flex justify-between items-center">
-                      <h4 className="font-bold text-white text-sm truncate">
-                        {t.company || t.title}
-                      </h4>
-                      <Badge status={t.status || 'pending'} />
-                    </div>
-                    <p className="text-xs text-neutral-400">
-                      {t.from} → {t.to}
-                    </p>
-                    <p className="text-xs text-neutral-500">
-                      {t.type} · BDT {t.price} · {t.seats} seats
-                    </p>
-                    <div className="flex gap-2 mt-auto pt-2 border-t border-neutral-900/40">
-                      <Button
-                        size="sm"
-                        onClick={() => handleEditSelect(t)}
-                        disabled={t.status === 'rejected'}
-                        className="flex-1 bg-neutral-800 text-white rounded-xl"
-                      >
-                        Update
-                      </Button>
-                      <Button
-                        size="sm"
-                        color="danger"
-                        variant="flat"
-                        onClick={() => handleDeleteTicket(t._id)}
-                        disabled={t.status === 'rejected'}
-                        className="flex-1 rounded-xl"
-                      >
-                        Delete
-                      </Button>
+                    <div className="p-5 flex flex-col gap-3 flex-1">
+                      <div className="flex justify-between items-center">
+                        <h4 className="font-bold text-white text-sm truncate">
+                          {t.company || t.title}
+                        </h4>
+                        <Badge status={t.status || 'pending'} />
+                      </div>
+                      <p className="text-xs text-neutral-400">
+                        {t.from} → {t.to}
+                      </p>
+                      <p className="text-xs text-neutral-500">
+                        {t.type} · BDT {t.price} · {t.seats} seats
+                      </p>
+                      {t.perks?.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {t.perks.slice(0, 3).map(p => (
+                            <span
+                              key={p}
+                              className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full"
+                            >
+                              ✓ {p}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      <div className="flex gap-2 mt-auto pt-2 border-t border-neutral-900/40">
+                        <Button
+                          size="sm"
+                          onClick={() => handleEditSelect(t)}
+                          disabled={t.status === 'rejected'}
+                          className={`flex-1 rounded-xl transition-all ${
+                            t.status === 'rejected'
+                              ? 'bg-neutral-800/40 text-neutral-600 cursor-not-allowed opacity-50'
+                              : 'bg-neutral-800 text-white hover:bg-neutral-700'
+                          }`}
+                        >
+                          Update
+                        </Button>
+                        <Button
+                          size="sm"
+                          color="danger"
+                          variant="flat"
+                          onClick={() => handleDeleteTicket(t._id)}
+                          disabled={t.status === 'rejected'}
+                          className={`flex-1 rounded-xl ${t.status === 'rejected' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          Delete
+                        </Button>
+                      </div>
                     </div>
                   </Card>
                 ))}
@@ -1009,7 +987,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* ── REQUESTED BOOKINGS (VENDOR) ───────────── */}
+        {/* ── REQUESTED BOOKINGS (VENDOR) ──────────────── */}
         {activeTab === 'requested-bookings' && user?.role === 'vendor' && (
           <Card className="bg-[#1e1e1e] border border-neutral-800 p-6 rounded-2xl shadow-xl overflow-x-auto">
             <h3 className="text-lg font-bold mb-4">Requested Bookings</h3>
@@ -1075,12 +1053,10 @@ export default function DashboardPage() {
           </Card>
         )}
 
-        {/* ── REVENUE OVERVIEW (VENDOR) ─────────────── */}
+        {/* ── REVENUE OVERVIEW (VENDOR) ────────────────── */}
         {activeTab === 'revenue' && user?.role === 'vendor' && (
           <div className="space-y-6">
             <h3 className="text-lg font-bold">Revenue Overview</h3>
-
-            {/* ✅ Stats Cards with real data */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-[#1e1e1e] border border-neutral-800 rounded-2xl p-5 flex items-center gap-4">
                 <div className="p-3 bg-emerald-500/10 rounded-xl">
@@ -1122,8 +1098,6 @@ export default function DashboardPage() {
                 </div>
               </div>
             </div>
-
-            {/* ✅ Chart with real data */}
             <Card className="bg-[#1e1e1e] border border-neutral-800 p-6 rounded-2xl shadow-xl">
               <h4 className="text-sm font-bold mb-4 text-neutral-300">
                 Revenue by Transport Type
@@ -1159,7 +1133,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* ── MANAGE TICKETS (ADMIN) ───────────────── */}
+        {/* ── MANAGE TICKETS (ADMIN) ───────────────────── */}
         {activeTab === 'manage-tickets' && user?.role === 'admin' && (
           <Card className="bg-[#1e1e1e] border border-neutral-800 p-6 rounded-2xl shadow-xl overflow-x-auto">
             <h3 className="text-lg font-bold mb-4">Manage Tickets</h3>
@@ -1218,7 +1192,7 @@ export default function DashboardPage() {
           </Card>
         )}
 
-        {/* ── MANAGE USERS (ADMIN) ─────────────────── */}
+        {/* ── MANAGE USERS (ADMIN) ─────────────────────── */}
         {activeTab === 'manage-users' && user?.role === 'admin' && (
           <Card className="bg-[#1e1e1e] border border-neutral-800 p-6 rounded-2xl shadow-xl overflow-x-auto">
             <h3 className="text-lg font-bold mb-4">Manage Users</h3>
@@ -1244,7 +1218,6 @@ export default function DashboardPage() {
                     </td>
                     <td className="p-4">
                       <div className="flex flex-wrap gap-2">
-                        {/* ✅ Make Admin button */}
                         <Button
                           size="sm"
                           color="secondary"
@@ -1255,7 +1228,6 @@ export default function DashboardPage() {
                         >
                           Make Admin
                         </Button>
-                        {/* Make Vendor button */}
                         <Button
                           size="sm"
                           color="warning"
@@ -1266,7 +1238,6 @@ export default function DashboardPage() {
                         >
                           Make Vendor
                         </Button>
-                        {/* Flag Fraud — only for vendors */}
                         {u.role === 'vendor' && (
                           <Button
                             size="sm"
@@ -1286,7 +1257,7 @@ export default function DashboardPage() {
           </Card>
         )}
 
-        {/* ── ADVERTISE TICKETS (ADMIN) ────────────── */}
+        {/* ── ADVERTISE TICKETS (ADMIN) ────────────────── */}
         {activeTab === 'advertise-tickets' && user?.role === 'admin' && (
           <Card className="bg-[#1e1e1e] border border-neutral-800 p-6 rounded-2xl shadow-xl overflow-x-auto">
             <div className="flex justify-between items-center mb-4">
@@ -1310,7 +1281,6 @@ export default function DashboardPage() {
                 {allTickets
                   .filter(t => t.status === 'approved')
                   .map(t => {
-                    // ✅ Disable Activate if already 6 are active
                     const cantActivate = !t.advertised && advertisedCount >= 6;
                     return (
                       <tr
@@ -1359,116 +1329,6 @@ export default function DashboardPage() {
           </Card>
         )}
       </main>
-
-      {/* ── PAYMENT MODAL ────────────────────────────── */}
-      {payTarget && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
-          <div className="w-full max-w-md bg-[#1e1e1e] border border-neutral-800 p-6 rounded-2xl shadow-2xl space-y-5">
-            <div className="flex justify-between items-start">
-              <div>
-                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                  <CreditCard className="w-5 h-5 text-emerald-500" /> Stripe
-                  Checkout
-                </h3>
-                <p className="text-xs text-neutral-500 mt-1">
-                  {payTarget.company || payTarget.title}
-                </p>
-              </div>
-            </div>
-            <form onSubmit={executePayment} className="space-y-4">
-              <div>
-                <label className="text-[10px] uppercase font-bold text-neutral-400 block mb-1">
-                  Card Number
-                </label>
-                <input
-                  required
-                  placeholder="4242 4242 4242 4242"
-                  maxLength={19}
-                  value={cardDetails.number}
-                  onChange={e =>
-                    setCardDetails({
-                      ...cardDetails,
-                      number: e.target.value
-                        .replace(/\s?/g, '')
-                        .replace(/(\d{4})/g, '$1 ')
-                        .trim(),
-                    })
-                  }
-                  className="w-full h-11 bg-neutral-900 border border-neutral-800 text-white rounded-xl px-4 text-sm font-mono outline-none focus:border-emerald-500 font-bold"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-[10px] uppercase font-bold text-neutral-400 block mb-1">
-                    Expiry
-                  </label>
-                  <input
-                    required
-                    placeholder="MM/YY"
-                    maxLength={5}
-                    value={cardDetails.expiry}
-                    onChange={e =>
-                      setCardDetails({ ...cardDetails, expiry: e.target.value })
-                    }
-                    className="w-full h-11 bg-neutral-900 border border-neutral-800 text-white rounded-xl px-4 text-sm font-mono outline-none focus:border-emerald-500"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] uppercase font-bold text-neutral-400 block mb-1">
-                    CVC
-                  </label>
-                  <input
-                    required
-                    placeholder="123"
-                    maxLength={3}
-                    value={cardDetails.cvc}
-                    onChange={e =>
-                      setCardDetails({ ...cardDetails, cvc: e.target.value })
-                    }
-                    className="w-full h-11 bg-neutral-900 border border-neutral-800 text-white rounded-xl px-4 text-sm font-mono outline-none focus:border-emerald-500"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="text-[10px] uppercase font-bold text-neutral-400 block mb-1">
-                  Cardholder Name
-                </label>
-                <input
-                  required
-                  placeholder="Your Name"
-                  value={cardDetails.name}
-                  onChange={e =>
-                    setCardDetails({ ...cardDetails, name: e.target.value })
-                  }
-                  className="w-full h-11 bg-neutral-900 border border-neutral-800 text-white rounded-xl px-4 text-sm outline-none focus:border-emerald-500 font-bold"
-                />
-              </div>
-              <div className="bg-neutral-900/60 p-3 rounded-xl flex justify-between items-center text-xs">
-                <span className="text-neutral-400">Total:</span>
-                <span className="text-emerald-400 font-black text-base">
-                  BDT {payTarget.price}
-                </span>
-              </div>
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => setPayTarget(null)}
-                  className="flex-1 bg-neutral-900 text-neutral-400 text-xs font-bold h-11 rounded-xl border border-neutral-800 hover:bg-neutral-800"
-                >
-                  Cancel
-                </button>
-                <Button
-                  type="submit"
-                  isLoading={payLoading}
-                  className="flex-1 bg-emerald-600 text-white font-bold h-11 rounded-xl"
-                >
-                  Pay BDT {payTarget.price}
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

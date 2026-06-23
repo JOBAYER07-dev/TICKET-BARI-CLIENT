@@ -1,7 +1,15 @@
 # TicketBari — Online Ticket Booking Platform
 
-## Live URL
+## Submit
 https://ticket-bari-client-one.vercel.app
+Admin Email: jobayerhosen045@gmail.com
+Admin Password: ILOVEYOU@@@
+Vendor Email:kakakaki0@gmail.com
+Vendor Password:1234567890
+Live Site Link : https://ticket-bari-client-one.vercel.app
+Github Repository ( server ) : https://github.com/JOBAYER07-dev/ticket-bari-server
+Github Repository ( client  ) : https://github.com/JOBAYER07-dev/TICKET-BARI-CLIENT
+
 
 ## Purpose
 A full-stack travel ticket booking platform where users 

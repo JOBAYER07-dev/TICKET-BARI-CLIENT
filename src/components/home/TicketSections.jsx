@@ -1,5 +1,5 @@
 'use client';
-
+import { motion } from 'framer-motion';
 import { useState, useEffect } from 'react';
 import { Button } from '@heroui/react';
 import {
@@ -32,12 +32,18 @@ function TicketGrid({ title, subtitle, data, typeLabel }) {
 
   return (
     <div className="w-full mb-16">
-      <div className="mb-6">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        viewport={{ once: true }}
+        className="mb-6"
+      >
         <h2 className="text-2xl font-bold text-white tracking-tight">
           {title}
         </h2>
         <p className="text-sm text-neutral-500">{subtitle}</p>
-      </div>
+      </motion.div>
 
       {data.length === 0 ? (
         <p className="text-xs text-neutral-500 bg-[#1e1e1e] p-8 rounded-2xl border border-neutral-800 text-center">
@@ -45,14 +51,18 @@ function TicketGrid({ title, subtitle, data, typeLabel }) {
         </p>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {data.map(ticket => {
+          {data.map((ticket, index) => {
             const type = ticket.type || 'Bus';
             const colorClass = transportColors[type] || transportColors.Bus;
             const bgColor = colorClass.split(' ')[0];
 
             return (
-              <div
+              <motion.div
                 key={ticket._id || ticket.id}
+                initial={{ opacity: 0, y: 40 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: index * 0.1 }}
+                viewport={{ once: true }}
                 className="bg-[#1e1e1e] border border-neutral-800 rounded-2xl overflow-hidden flex flex-col justify-between h-[380px] hover:border-neutral-700 transition-all group shadow-lg"
               >
                 {/* Image / Icon Block */}
@@ -101,7 +111,6 @@ function TicketGrid({ title, subtitle, data, typeLabel }) {
                       </span>
                     </div>
 
-                    {/* ✅ Fixed: removed 固定 typo from className */}
                     <div className="flex flex-col gap-1.5 text-xs text-neutral-400 border-t border-neutral-900/60 pt-3">
                       <div className="flex items-center gap-2">
                         <Calendar className="w-3.5 h-3.5 text-neutral-500" />
@@ -117,7 +126,6 @@ function TicketGrid({ title, subtitle, data, typeLabel }) {
                       </div>
                     </div>
 
-                    {/* ✅ Perks */}
                     {ticket.perks?.length > 0 && (
                       <div className="flex flex-wrap gap-1.5 mt-2">
                         {ticket.perks.slice(0, 3).map(p => (
@@ -145,7 +153,7 @@ function TicketGrid({ title, subtitle, data, typeLabel }) {
                     </Button>
                   </Link>
                 </div>
-              </div>
+              </motion.div>
             );
           })}
         </div>

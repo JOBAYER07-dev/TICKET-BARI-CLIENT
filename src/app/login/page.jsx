@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Button } from '@heroui/react';
-import { Mail, Lock, Bus } from 'lucide-react';
+import { Mail, Lock, Bus, Eye, EyeOff } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { apiRequest } from '@/utils/api';
@@ -13,9 +13,9 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({ email: '', password: '' });
 
-  // ── Email/Password Login ─────────────────────
   const handleSubmit = async e => {
     e.preventDefault();
     setError('');
@@ -42,7 +42,6 @@ export default function LoginPage() {
     }
   };
 
-  // ── Google OAuth Login (postMessage flow) ────
   const handleGoogleLogin = async () => {
     setError('');
     setGoogleLoading(true);
@@ -51,7 +50,6 @@ export default function LoginPage() {
       const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
       if (!GOOGLE_CLIENT_ID) throw new Error('OAuth Client ID missing.');
 
-      // ✅ redirect_uri → /auth/callback (dedicated callback page)
       const redirectUri = encodeURIComponent(
         window.location.origin + '/auth/callback',
       );
@@ -81,13 +79,10 @@ export default function LoginPage() {
 
       toast.info('Opening Google sign-in window...');
 
-      // ✅ Listen for postMessage from /auth/callback page
       const handleMessage = async event => {
-        // Security: only accept messages from our own origin
         if (event.origin !== window.location.origin) return;
         if (event.data?.type !== 'GOOGLE_AUTH_SUCCESS') return;
 
-        // Clean up immediately
         window.removeEventListener('message', handleMessage);
         clearInterval(closedChecker);
 
@@ -102,7 +97,6 @@ export default function LoginPage() {
 
           toast.loading('Verifying your Google account...');
 
-          // Fetch user profile from Google
           const profileRes = await fetch(
             `https://www.googleapis.com/oauth2/v3/userinfo?access_token=${accessToken}`,
           );
@@ -112,7 +106,6 @@ export default function LoginPage() {
             throw new Error('Could not retrieve email from Google account.');
           }
 
-          // Sync with MongoDB via our server
           const data = await apiRequest('/auth/social-sync', {
             method: 'POST',
             body: JSON.stringify({
@@ -144,7 +137,6 @@ export default function LoginPage() {
 
       window.addEventListener('message', handleMessage);
 
-      // Fallback: if user closes popup without completing auth
       const closedChecker = setInterval(() => {
         if (popup.closed) {
           clearInterval(closedChecker);
@@ -211,15 +203,26 @@ export default function LoginPage() {
             <div className="relative flex items-center">
               <Lock className="w-4 h-4 text-neutral-500 absolute left-3 z-10" />
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 placeholder="••••••••"
                 value={formData.password}
                 onChange={e =>
                   setFormData({ ...formData, password: e.target.value })
                 }
-                className="w-full h-11 bg-neutral-900 border border-neutral-800 rounded-xl pl-10 pr-4 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-emerald-500 transition-colors"
+                className="w-full h-11 bg-neutral-900 border border-neutral-800 rounded-xl pl-10 pr-10 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-emerald-500 transition-colors"
                 required
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(prev => !prev)}
+                className="absolute right-3 text-neutral-500 hover:text-neutral-300 transition-colors z-10"
+              >
+                {showPassword ? (
+                  <EyeOff className="w-4 h-4" />
+                ) : (
+                  <Eye className="w-4 h-4" />
+                )}
+              </button>
             </div>
           </div>
 

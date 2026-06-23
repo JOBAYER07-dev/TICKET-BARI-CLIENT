@@ -1,5 +1,6 @@
 'use client';
 
+import { motion } from 'framer-motion';
 import { ShieldCheck, Clock, Smartphone } from 'lucide-react';
 
 const popularRoutes = [
@@ -12,7 +13,13 @@ const popularRoutes = [
 export default function ExtraSections() {
   return (
     <section className="max-w-[1280px] mx-auto px-6 pb-20 grid grid-cols-1 lg:grid-cols-2 gap-8">
-      <div className="bg-[#1e1e1e] border border-neutral-800 rounded-2xl p-6 shadow-xl">
+      <motion.div
+        initial={{ opacity: 0, x: -50 }}
+        whileInView={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.5 }}
+        viewport={{ once: true }}
+        className="bg-[#1e1e1e] border border-neutral-800 rounded-2xl p-6 shadow-xl"
+      >
         <h3 className="text-white font-bold text-lg mb-4 tracking-tight">
           Popular Routes
         </h3>
@@ -31,9 +38,15 @@ export default function ExtraSections() {
             </div>
           ))}
         </div>
-      </div>
+      </motion.div>
 
-      <div className="bg-[#1e1e1e] border border-neutral-800 rounded-2xl p-6 shadow-xl flex flex-col justify-center gap-6">
+      <motion.div
+        initial={{ opacity: 0, x: 50 }}
+        whileInView={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.5 }}
+        viewport={{ once: true }}
+        className="bg-[#1e1e1e] border border-neutral-800 rounded-2xl p-6 shadow-xl flex flex-col justify-center gap-6"
+      >
         <h3 className="text-white font-bold text-lg tracking-tight mb-1">
           Why Choose TicketBari?
         </h3>
@@ -79,7 +92,7 @@ export default function ExtraSections() {
             </p>
           </div>
         </div>
-      </div>
+      </motion.div>
     </section>
   );
 }

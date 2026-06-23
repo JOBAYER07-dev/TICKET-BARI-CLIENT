@@ -13,7 +13,7 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className="min-h-screen">
+      <body className="min-h-screen" suppressHydrationWarning>
         <Providers>
           <ToastContainer theme="dark" position="top-right" autoClose={3000} />
           <Navbar />
