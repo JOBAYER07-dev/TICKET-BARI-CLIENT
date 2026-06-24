@@ -482,11 +482,35 @@ export default function DashboardPage() {
           </div>
           <Badge status={user?.role} />
         </div>
-
         {/* ── PROFILE ─────────────────────────────────── */}
         {activeTab === 'profile' && (
           <Card className="bg-[#1e1e1e] border border-neutral-800 p-6 rounded-2xl shadow-xl">
             <h3 className="text-lg font-bold mb-6">Account Overview</h3>
+
+            {/* Avatar */}
+            <div className="flex items-center gap-4 mb-6 p-4 bg-neutral-900 rounded-2xl border border-neutral-800">
+              <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-emerald-500/30 flex items-center justify-center bg-emerald-500/10 shrink-0">
+                {user?.photoURL ? (
+                  <img
+                    src={user.photoURL}
+                    alt={user.name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="text-2xl font-black text-emerald-400">
+                    {user?.name?.charAt(0)?.toUpperCase()}
+                  </span>
+                )}
+              </div>
+              <div>
+                <h4 className="font-bold text-white text-lg">{user?.name}</h4>
+                <p className="text-xs text-neutral-500 font-mono">
+                  {user?.email}
+                </p>
+                <Badge status={user?.role} />
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
               {[
                 { label: 'Full Name', value: user?.name },
@@ -598,6 +622,28 @@ export default function DashboardPage() {
                               Now
                             </Button>
                           ))}
+                        {b.status === 'pending' && (
+                          <Button
+                            size="sm"
+                            color="danger"
+                            variant="flat"
+                            onClick={async () => {
+                              if (!confirm('Cancel this booking?')) return;
+                              try {
+                                await apiRequest(`/bookings/${b._id}`, {
+                                  method: 'DELETE',
+                                });
+                                toast.success('Booking cancelled.');
+                                fetchData(user);
+                              } catch (err) {
+                                toast.error(err.message);
+                              }
+                            }}
+                            className="text-xs font-bold rounded-xl w-full mt-1"
+                          >
+                            Cancel Booking
+                          </Button>
+                        )}
                       </div>
                     </Card>
                   );

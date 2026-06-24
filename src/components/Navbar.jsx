@@ -1,10 +1,20 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Button } from '@heroui/react';
-import { Bus, Sun, Moon, User, LogOut, Menu, X } from 'lucide-react';
+import {
+  Bus,
+  Sun,
+  Moon,
+  User,
+  LogOut,
+  Menu,
+  X,
+  LayoutDashboard,
+  ChevronDown,
+} from 'lucide-react';
 import { useTheme } from 'next-themes';
 
 export default function Navbar() {
@@ -14,6 +24,8 @@ export default function Navbar() {
   const [user, setUser] = useState(null);
   const [mounted, setMounted] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
 
   useEffect(() => {
     setMounted(true);
@@ -21,10 +33,22 @@ export default function Navbar() {
     setUser(storedUser ? JSON.parse(storedUser) : null);
   }, [pathname]);
 
+  // dropdown বাইরে click করলে বন্ধ হবে
+  useEffect(() => {
+    const handleClickOutside = e => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setUser(null);
+    setDropdownOpen(false);
     router.push('/login');
   };
 
@@ -37,7 +61,7 @@ export default function Navbar() {
   const isDark = resolvedTheme === 'dark';
 
   return (
-    <nav className="w-full h-16 bg-[#1a1a1a]/90 dark:bg-[#1a1a1a]/90 light:bg-white/90 backdrop-blur-md border-b border-neutral-800 dark:border-neutral-800 light:border-neutral-200 fixed top-0 left-0 z-50 px-6 flex items-center justify-between text-white">
+    <nav className="w-full h-16 bg-[#1a1a1a]/90 backdrop-blur-md border-b border-neutral-800 fixed top-0 left-0 z-50 px-6 flex items-center justify-between text-white">
       {/* Logo */}
       <Link
         href="/"
@@ -72,7 +96,7 @@ export default function Navbar() {
 
       {/* Right Actions */}
       <div className="flex items-center gap-3">
-        {/* Dark/Light Toggle — only render after mount to avoid hydration mismatch */}
+        {/* Dark/Light Toggle */}
         {mounted && (
           <button
             onClick={() => setTheme(isDark ? 'light' : 'dark')}
@@ -88,33 +112,62 @@ export default function Navbar() {
         )}
 
         {user ? (
-          <div className="hidden md:flex items-center gap-3 bg-neutral-900 border border-neutral-800 px-3 py-1.5 rounded-xl">
-            <div className="w-7 h-7 bg-emerald-500/10 text-emerald-500 rounded-lg flex items-center justify-center border border-emerald-500/20">
-              {user.photoURL ? (
-                <img
-                  src={user.photoURL}
-                  alt="avatar"
-                  className="w-7 h-7 rounded-lg object-cover"
-                />
-              ) : (
-                <User className="w-4 h-4" />
-              )}
-            </div>
-            <div className="flex flex-col text-left">
-              <span className="text-xs font-bold leading-tight text-neutral-200">
-                {user.name}
-              </span>
-              <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-500">
-                {user.role}
-              </span>
-            </div>
+          // ── Avatar Dropdown ──────────────────────────
+          <div className="hidden md:block relative" ref={dropdownRef}>
             <button
-              onClick={handleLogout}
-              title="Logout"
-              className="ml-2 p-1.5 text-neutral-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
+              onClick={() => setDropdownOpen(prev => !prev)}
+              className="flex items-center gap-2.5 bg-neutral-900 border border-neutral-800 px-3 py-1.5 rounded-xl hover:border-neutral-700 transition-all"
             >
-              <LogOut className="w-4 h-4" />
+              {/* Avatar */}
+              <div className="w-7 h-7 bg-emerald-500/10 text-emerald-500 rounded-lg flex items-center justify-center border border-emerald-500/20 overflow-hidden shrink-0">
+                {user.photoURL ? (
+                  <img
+                    src={user.photoURL}
+                    alt="avatar"
+                    className="w-7 h-7 rounded-lg object-cover"
+                  />
+                ) : (
+                  <span className="text-xs font-black">
+                    {user.name?.charAt(0)?.toUpperCase()}
+                  </span>
+                )}
+              </div>
+              {/* Name + Role */}
+              <div className="flex flex-col text-left">
+                <span className="text-xs font-bold leading-tight text-neutral-200">
+                  {user.name}
+                </span>
+                <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-500">
+                  {user.role}
+                </span>
+              </div>
+              <ChevronDown
+                className={`w-3.5 h-3.5 text-neutral-500 transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`}
+              />
             </button>
+
+            {/* Dropdown Menu */}
+            {dropdownOpen && (
+              <div className="absolute right-0 top-full mt-2 w-48 bg-[#1a1a1a] border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden z-50">
+                <div className="p-2 flex flex-col gap-0.5">
+                  <Link
+                    href="/dashboard"
+                    onClick={() => setDropdownOpen(false)}
+                    className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-neutral-300 hover:bg-neutral-800 hover:text-white transition-colors"
+                  >
+                    <LayoutDashboard className="w-4 h-4 text-emerald-500" />
+                    My Profile
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-neutral-300 hover:bg-red-500/10 hover:text-red-400 transition-colors w-full text-left"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Logout
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div className="hidden md:flex items-center gap-2">
@@ -169,15 +222,24 @@ export default function Navbar() {
             </Link>
           ))}
           {user ? (
-            <button
-              onClick={() => {
-                handleLogout();
-                setMobileOpen(false);
-              }}
-              className="px-4 py-2.5 rounded-xl text-sm font-semibold text-red-400 hover:bg-red-500/10 text-left flex items-center gap-2"
-            >
-              <LogOut className="w-4 h-4" /> Logout ({user.name})
-            </button>
+            <>
+              <Link
+                href="/dashboard"
+                onClick={() => setMobileOpen(false)}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-neutral-400 hover:text-white hover:bg-neutral-800"
+              >
+                <User className="w-4 h-4" /> My Profile
+              </Link>
+              <button
+                onClick={() => {
+                  handleLogout();
+                  setMobileOpen(false);
+                }}
+                className="px-4 py-2.5 rounded-xl text-sm font-semibold text-red-400 hover:bg-red-500/10 text-left flex items-center gap-2"
+              >
+                <LogOut className="w-4 h-4" /> Logout ({user.name})
+              </button>
+            </>
           ) : (
             <div className="flex gap-2 pt-2">
               <Link
