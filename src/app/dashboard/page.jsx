@@ -360,10 +360,18 @@ export default function DashboardPage() {
 
   const handleUpdateRole = async (userId, role) => {
     try {
-      await apiRequest(`/users/role/${userId}`, {
+      const data = await apiRequest(`/users/role/${userId}`, {
         method: 'PATCH',
         body: JSON.stringify({ role }),
       });
+
+      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+      const targetUser = allUsers.find(u => u._id === userId);
+      if (targetUser?.email === currentUser?.email && data.newToken) {
+        localStorage.setItem('token', data.newToken);
+        localStorage.setItem('user', JSON.stringify({ ...currentUser, role }));
+      }
+
       toast.success(`User promoted to ${role}.`);
       fetchData(user);
     } catch (err) {
